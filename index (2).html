@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Med AI Simulator</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      body {
+        height: 100vh;
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        color: white;
+      }
+
+      main {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 40px;
+        flex: 1;
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(15px);
+        border-radius: 20px;
+        padding: 30px;
+        width: 400px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        text-align: center;
+      }
+
+      #vaziyat {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+
+      #image_person {
+        width: 220px;
+        height: 220px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 255, 255, 0.2);
+      }
+
+      footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        padding: 20px;
+      }
+
+      #solve {
+        width: 300px;
+        padding: 12px;
+        border-radius: 10px;
+        border: none;
+        outline: none;
+      }
+
+      #btn {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #00c6ff, #0072ff);
+        color: white;
+        cursor: pointer;
+      }
+
+      #audioBtn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #ff7e5f, #feb47b);
+        color: white;
+        cursor: pointer;
+        display: none;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <img
+        src="https://media.pixverse.ai/pixverse%2Ft2i%2Fori%2Fbc722b61-db3e-41ea-ae24-f144b5f3f498.jpg"
+        id="image_person"
+      />
+
+      <div class="card">
+        <p id="vaziyat"></p>
+        <button id="audioBtn">▶ Play</button>
+      </div>
+    </main>
+
+    <footer>
+      <input type="text" id="solve" placeholder="Tashxisingiz..." />
+      <button id="btn">Yuborish</button>
+
+      <audio id="ttsAudio" src="audio/voice.mp3"></audio>
+    </footer>
+
+    <script>
+      const text = document.querySelector("#vaziyat");
+      const audioBtn = document.querySelector("#audioBtn");
+      const audio = document.querySelector("#ttsAudio");
+
+      let texts =
+        "Assalomu alaykum, sizni qanday yordam bera olaman? Men sizning simptomlaringizni tinglab, taxminiy tashxis berishga harakat qilaman.";
+
+      let typingSpeed = 40;
+      let isPlaying = false;
+
+      // TYPING
+      for (let i = 0; i < texts.length; i++) {
+        setTimeout(() => {
+          text.textContent += texts[i];
+        }, typingSpeed * i);
+      }
+
+      // Button show
+      setTimeout(() => {
+        audioBtn.style.display = "inline-block";
+      }, texts.length * typingSpeed + 300);
+
+      // BUTTON CLICK (PLAY/PAUSE SWITCH)
+      audioBtn.addEventListener("click", () => {
+        if (!isPlaying) {
+          audio.currentTime = 0;
+          audio.play();
+          audioBtn.textContent = "⏸ Pause";
+          isPlaying = true;
+        } else {
+          audio.pause();
+          audioBtn.textContent = "▶ Play";
+          isPlaying = false;
+        }
+      });
+
+      // Audio tugasa reset
+      audio.onended = () => {
+        audioBtn.textContent = "▶ Play";
+        isPlaying = false;
+      };
+    </script>
+  </body>
+</html>

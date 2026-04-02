@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 280" fill="none">
+  <rect width="220" height="280" rx="16" fill="#1a2332"/>
+  <!-- Hospital gown background -->
+  <rect x="40" y="155" width="140" height="125" rx="8" fill="#2d8cf0" opacity="0.15"/>
+  <!-- Body/shoulders -->
+  <path d="M50 280 C50 210 80 185 110 180 C140 185 170 210 170 280" fill="#3b82f6" opacity="0.3"/>
+  <!-- Neck -->
+  <rect x="95" y="148" width="30" height="25" rx="6" fill="#c4956a"/>
+  <!-- Head -->
+  <ellipse cx="110" cy="110" rx="48" ry="55" fill="#d4a574"/>
+  <!-- Hair (short male style) -->
+  <path d="M62 100 C62 60 80 45 110 42 C140 45 158 60 158 100 C158 80 145 55 110 52 C75 55 62 80 62 100Z" fill="#3d2b1f"/>
+  <!-- Eyebrows -->
+  <rect x="78" y="92" width="20" height="3" rx="1.5" fill="#3d2b1f"/>
+  <rect x="122" y="92" width="20" height="3" rx="1.5" fill="#3d2b1f"/>
+  <!-- Eyes -->
+  <ellipse cx="88" cy="105" rx="7" ry="5" fill="white"/>
+  <ellipse cx="132" cy="105" rx="7" ry="5" fill="white"/>
+  <circle cx="89" cy="105" r="3.5" fill="#4a3728"/>
+  <circle cx="133" cy="105" r="3.5" fill="#4a3728"/>
+  <circle cx="90" cy="104" r="1.2" fill="white"/>
+  <circle cx="134" cy="104" r="1.2" fill="white"/>
+  <!-- Nose -->
+  <path d="M107 108 C107 118 105 122 110 124 C115 122 113 118 113 108" stroke="#b8906a" stroke-width="1.5" fill="none"/>
+  <!-- Mouth (slight grimace - patient in discomfort) -->
+  <path d="M98 133 C103 136 117 136 122 133" stroke="#a07060" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Ears -->
+  <ellipse cx="62" cy="108" rx="6" ry="10" fill="#c4956a"/>
+  <ellipse cx="158" cy="108" rx="6" ry="10" fill="#c4956a"/>
+  <!-- Hospital gown collar -->
+  <path d="M75 175 L95 168 L110 178 L125 168 L145 175 L145 195 L75 195Z" fill="#4da6ff" opacity="0.5"/>
+  <!-- V-neck line -->
+  <line x1="110" y1="178" x2="110" y2="200" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  <!-- Subtle worried expression lines on forehead -->
+  <line x1="90" y1="82" x2="100" y2="84" stroke="#b8906a" stroke-width="0.8" opacity="0.4"/>
+  <line x1="120" y1="84" x2="130" y2="82" stroke="#b8906a" stroke-width="0.8" opacity="0.4"/>
+</svg>

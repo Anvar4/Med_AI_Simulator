@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 280" fill="none">
+  <rect width="220" height="280" rx="16" fill="#1a2332"/>
+  <!-- Hospital gown background -->
+  <rect x="40" y="155" width="140" height="125" rx="8" fill="#f06292" opacity="0.1"/>
+  <!-- Body/shoulders -->
+  <path d="M50 280 C50 210 80 185 110 180 C140 185 170 210 170 280" fill="#e91e8c" opacity="0.15"/>
+  <!-- Neck -->
+  <rect x="95" y="150" width="30" height="22" rx="6" fill="#d4a88c"/>
+  <!-- Head -->
+  <ellipse cx="110" cy="112" rx="46" ry="52" fill="#deb896"/>
+  <!-- Hair (long female style) -->
+  <path d="M64 105 C64 62 82 42 110 38 C138 42 156 62 156 105" fill="#2c1810"/>
+  <!-- Side hair left -->
+  <path d="M64 105 C60 105 55 120 56 150 C57 160 62 162 65 155 C66 140 64 120 65 105Z" fill="#2c1810"/>
+  <!-- Side hair right -->
+  <path d="M156 105 C160 105 165 120 164 150 C163 160 158 162 155 155 C154 140 156 120 155 105Z" fill="#2c1810"/>
+  <!-- Hair bangs -->
+  <path d="M72 82 C72 68 85 52 110 48 C135 52 148 68 148 82 C145 73 130 60 110 58 C90 60 75 73 72 82Z" fill="#3a2218"/>
+  <!-- Eyebrows (thinner, arched) -->
+  <path d="M78 92 C82 88 92 88 98 91" stroke="#3d2b1f" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M122 91 C128 88 138 88 142 92" stroke="#3d2b1f" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Eyes (slightly larger with lashes) -->
+  <ellipse cx="88" cy="105" rx="8" ry="5.5" fill="white"/>
+  <ellipse cx="132" cy="105" rx="8" ry="5.5" fill="white"/>
+  <circle cx="89" cy="105" r="3.5" fill="#4a3728"/>
+  <circle cx="133" cy="105" r="3.5" fill="#4a3728"/>
+  <circle cx="90" cy="104" r="1.2" fill="white"/>
+  <circle cx="134" cy="104" r="1.2" fill="white"/>
+  <!-- Eyelashes -->
+  <path d="M80 100 C82 98 85 99 87 99" stroke="#2c1810" stroke-width="1" fill="none"/>
+  <path d="M133 99 C135 99 138 98 140 100" stroke="#2c1810" stroke-width="1" fill="none"/>
+  <!-- Nose -->
+  <path d="M107 108 C107 116 106 120 110 122 C114 120 113 116 113 108" stroke="#c4956a" stroke-width="1.2" fill="none"/>
+  <!-- Lips (fuller) -->
+  <path d="M99 132 C104 136 116 136 121 132" stroke="#c47070" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M101 132 C106 128 114 128 119 132" stroke="#d48080" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Ears (partially hidden by hair) -->
+  <ellipse cx="64" cy="108" rx="4" ry="8" fill="#d4a88c"/>
+  <ellipse cx="156" cy="108" rx="4" ry="8" fill="#d4a88c"/>
+  <!-- Hospital gown collar (rounded) -->
+  <path d="M72 178 C85 170 100 172 110 180 C120 172 135 170 148 178 L148 200 L72 200Z" fill="#f48fb1" opacity="0.35"/>
+  <!-- Hijab/headscarf option faint line (cultural sensitivity) -->
+  <!-- Subtle worried expression -->
+  <path d="M92 85 C95 83 98 84 100 85" stroke="#c4956a" stroke-width="0.6" opacity="0.3" fill="none"/>
+  <path d="M120 85 C122 84 125 83 128 85" stroke="#c4956a" stroke-width="0.6" opacity="0.3" fill="none"/>
+</svg>
