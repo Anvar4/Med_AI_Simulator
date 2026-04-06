@@ -1,10 +1,8 @@
 'use client'
 
-import { api } from '@/lib/api';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, Pause, Play, Volume2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface PatientSimulatorProps {
 	patientName: string
@@ -27,9 +25,6 @@ export default function PatientSimulator({
 
 	const [displayedText, setDisplayedText] = useState('')
 	const [isTypingDone, setIsTypingDone] = useState(false)
-	const [isSpeaking, setIsSpeaking] = useState(false)
-	const [isLoading, setIsLoading] = useState(false)
-	const audioRef = useRef<HTMLAudioElement | null>(null)
 	const charIndexRef = useRef(0)
 
 	// Typing effect
@@ -48,55 +43,6 @@ export default function PatientSimulator({
 
 		return () => clearInterval(interval)
 	}, [fullText])
-
-	const handleSpeak = useCallback(async () => {
-		// If currently playing, stop
-		if (isSpeaking && audioRef.current) {
-			audioRef.current.pause()
-			audioRef.current.currentTime = 0
-			setIsSpeaking(false)
-			return
-		}
-
-		setIsLoading(true)
-		try {
-			const model = gender === 'Ayol' ? 'gulnoza' : 'jaxongir'
-			const res = await api.tts.speak(fullText, model)
-
-			if (res.audioUrl) {
-				const audio = new Audio(res.audioUrl)
-				audioRef.current = audio
-
-				audio.onended = () => {
-					setIsSpeaking(false)
-					audioRef.current = null
-				}
-				audio.onerror = () => {
-					setIsSpeaking(false)
-					audioRef.current = null
-				}
-
-				await audio.play()
-				setIsSpeaking(true)
-			}
-		} catch (err) {
-			console.error('TTS error:', err)
-		} finally {
-			setIsLoading(false)
-		}
-	}, [isSpeaking, fullText, gender])
-
-	// Cleanup audio on unmount
-	useEffect(() => {
-		return () => {
-			if (audioRef.current) {
-				audioRef.current.pause()
-				audioRef.current = null
-			}
-		}
-	}, [])
-
-	const barHeights = useMemo(() => [12, 18, 10, 16, 14], [])
 
 	const defaultAvatar = gender === 'Ayol' ? '/female.png' : '/male.png'
 
@@ -196,65 +142,7 @@ export default function PatientSimulator({
 							)}
 						</p>
 
-						{/* Audio Button */}
-						<AnimatePresence>
-							{isTypingDone && (
-								<motion.button
-									initial={{ opacity: 0, y: 10 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0 }}
-									transition={{ duration: 0.3 }}
-									onClick={handleSpeak}
-									disabled={isLoading}
-									className={`mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-										isSpeaking
-											? 'bg-orange-500/20 text-orange-300 border border-orange-500/30 hover:bg-orange-500/30'
-											: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
-									}`}
-								>
-									{isLoading ? (
-										<>
-											<Loader2 className='w-4 h-4 animate-spin' />
-											Tayyorlanmoqda...
-										</>
-									) : isSpeaking ? (
-										<>
-											<Pause className='w-4 h-4' />
-											To&apos;xtatish
-										</>
-									) : (
-										<>
-											<Play className='w-4 h-4' />
-											Ovozli tinglash
-										</>
-									)}
-								</motion.button>
-							)}
-						</AnimatePresence>
 					</div>
-
-					{/* Speech indicator */}
-					{isSpeaking && (
-						<div className='flex items-center gap-2 mt-3 ml-2'>
-							<Volume2 className='w-4 h-4 text-emerald-400 animate-pulse' />
-							<div className='flex items-center gap-0.5'>
-								{barHeights.map((h, i) => (
-									<div
-										key={i}
-										className='w-1 bg-emerald-400/70 rounded-full animate-bounce'
-										style={{
-											height: `${h}px`,
-											animationDelay: `${i * 0.1}s`,
-											animationDuration: '0.6s',
-										}}
-									/>
-								))}
-							</div>
-							<span className='text-xs text-emerald-400/70'>
-								Gapirmoqda...
-							</span>
-						</div>
-					)}
 
 				</div>
 			</div>

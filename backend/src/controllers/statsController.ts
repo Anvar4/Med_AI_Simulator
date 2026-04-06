@@ -1,7 +1,7 @@
-import { Response } from 'express'
-import mongoose from 'mongoose'
-import { AuthRequest } from '../middleware/auth'
-import { CaseAttempt } from '../models/CaseAttempt'
+import { Response } from 'express';
+import mongoose from 'mongoose';
+import { AuthRequest } from '../middleware/auth';
+import { CaseAttempt } from '../models/CaseAttempt';
 
 // ─── Detailed user statistics ──────────────────────────────────
 export const getUserStats = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -293,6 +293,7 @@ export const getLeaderboard = async (req: AuthRequest, res: Response): Promise<v
         },
       },
       { $unwind: '$userInfo' },
+      { $match: { 'userInfo.role': 'student' } },
       {
         $project: {
           userId: '$_id',
@@ -331,7 +332,9 @@ export const getLeaderboard = async (req: AuthRequest, res: Response): Promise<v
     // Find current user's rank if outside top 100
     let currentUserRank = leaderboard.find(r => r.isCurrentUser) ?? null
 
-    if (!currentUserRank) {
+    const currentUserRole = req.user?.role
+
+    if (!currentUserRank && currentUserRole === 'student') {
       const myStats = await CaseAttempt.aggregate([
         { $match: { user: new mongoose.Types.ObjectId(String(currentUserId)), status: 'completed' } },
         {
@@ -348,7 +351,16 @@ export const getLeaderboard = async (req: AuthRequest, res: Response): Promise<v
         const rankCount = await CaseAttempt.aggregate([
           { $match: { status: 'completed' } },
           { $group: { _id: '$user', avgScore: { $avg: '$score' } } },
-          { $match: { avgScore: { $gt: myStats[0].avgScore } } },
+          {
+            $lookup: {
+              from: 'users',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'userInfo',
+            },
+          },
+          { $unwind: '$userInfo' },
+          { $match: { 'userInfo.role': 'student', avgScore: { $gt: myStats[0].avgScore } } },
           { $count: 'count' },
         ])
         const me = req.user! as { firstName?: string; lastName?: string; avatar?: string; role: string }

@@ -1,9 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
-import { X, ZoomIn } from 'lucide-react'
-import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion';
+import { X, ZoomIn } from 'lucide-react';
+import { useState } from 'react';
 
 /* ─── Types ─── */
 export interface LabResult {
@@ -24,11 +24,24 @@ export interface MediaItemData {
 const MEDIA_LABELS: Record<string, string> = { xray: 'RENTGEN', ekg: 'EKG', echo: 'EXO', image: 'RASM', video: 'VIDEO' }
 const MEDIA_ALT: Record<string, string> = { xray: 'Rentgen rasmi', ekg: 'EKG rasmi', echo: 'EXO rasmi', image: 'Rasm', video: 'Video' }
 
+const BACKEND_ORIGIN = (() => {
+	const fallback = 'http://localhost:5000'
+	const configured = process.env.NEXT_PUBLIC_API_URL
+	if (!configured) return fallback
+
+	try {
+		return new URL(configured).origin
+	} catch {
+		return fallback
+	}
+})()
+
 /** Resolve media src: if it's a relative path, prepend backend URL */
 function resolveMediaSrc(fileData: string): string {
 	if (!fileData) return ''
 	if (fileData.startsWith('data:') || fileData.startsWith('http')) return fileData
-	return `http://localhost:5000${fileData}`
+	const normalizedPath = fileData.startsWith('/') ? fileData : `/${fileData}`
+	return `${BACKEND_ORIGIN}${normalizedPath}`
 }
 
 /* ─── Media Viewer ─────────────────────────────────── */

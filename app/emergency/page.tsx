@@ -1,16 +1,22 @@
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import Card from '@/components/ui/Card'
-import { api, BackendCase } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
-import { AnimatePresence, motion } from 'framer-motion'
-import { AlertCircle, ArrowRight, CheckCircle, Clock, CreditCard, Lock, Stethoscope, XCircle, Zap } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import Sidebar from '@/components/layout/Sidebar';
+import Card from '@/components/ui/Card';
+import { api, BackendCase } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Activity, AlertCircle, ArrowRight, CheckCircle, Clock, CreditCard, Filter, Lock, Search, Stethoscope, User, XCircle, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-const EMERGENCY_TIME = 300 // 5 minutes per case
+const DEFAULT_EMERGENCY_TIME = 300 // fallback: 5 minutes per case
+
+function getEmergencyTimeLimit(caseItem?: BackendCase | null): number {
+	if (!caseItem) return DEFAULT_EMERGENCY_TIME
+	const raw = Number(caseItem.timeLimit)
+	return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_EMERGENCY_TIME
+}
 
 function formatTime(seconds: number) {
 	const m = Math.floor(seconds / 60)
@@ -24,11 +30,14 @@ export default function EmergencyPage() {
 	const [cases, setCases] = useState<BackendCase[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState('')
+	const [search, setSearch] = useState('')
+	const [categoryFilter, setCategoryFilter] = useState('all')
+	const [difficultyFilter, setDifficultyFilter] = useState<'all' | 'easy' | 'medium' | 'hard'>('all')
 
 	// Active case session
 	const [activeCase, setActiveCase] = useState<BackendCase | null>(null)
 	const [attemptId, setAttemptId] = useState<string | null>(null)
-	const [timeLeft, setTimeLeft] = useState(EMERGENCY_TIME)
+	const [timeLeft, setTimeLeft] = useState(DEFAULT_EMERGENCY_TIME)
 	const [timerRunning, setTimerRunning] = useState(false)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -41,11 +50,71 @@ export default function EmergencyPage() {
 
 	useEffect(() => {
 		if (!user) { router.push('/login'); return }
-		api.cases.getAll({ type: 'shoshilinch' })
-			.then(res => setCases(res.cases))
+		api.cases.getAll({ type: 'shoshilinch', status: 'published', withMedia: true, limit: 100 })
+			.then(res => {
+				const prepared = (res.cases || []).filter(c => (c.mediaItems?.length ?? 0) > 0)
+				setCases(prepared)
+			})
 			.catch(e => setError(e.message || 'Xatolik'))
 			.finally(() => setLoading(false))
 	}, [user, router])
+
+	const categories = useMemo(() => {
+		const items = Array.from(new Set(cases.map(c => c.category).filter(Boolean)))
+		return items.sort((a, b) => a.localeCompare(b))
+	}, [cases])
+
+	const filteredCases = useMemo(() => {
+		return cases.filter(c => {
+			const q = search.trim().toLowerCase()
+			const matchesSearch =
+				!q ||
+				c.title.toLowerCase().includes(q) ||
+				(c.patient?.complaints || '').toLowerCase().includes(q) ||
+				(c.authorName || '').toLowerCase().includes(q)
+
+			const matchesCategory = categoryFilter === 'all' || c.category === categoryFilter
+
+			const matchesDifficulty = difficultyFilter === 'all'
+				|| (difficultyFilter === 'easy' && c.difficulty <= 2)
+				|| (difficultyFilter === 'medium' && c.difficulty === 3)
+				|| (difficultyFilter === 'hard' && c.difficulty >= 4)
+
+			return matchesSearch && matchesCategory && matchesDifficulty
+		})
+	}, [cases, search, categoryFilter, difficultyFilter])
+
+	const emergencyStats = useMemo(() => {
+		if (cases.length === 0) {
+			return { total: 0, avgDifficulty: 0, withLabs: 0, withAuthors: 0 }
+		}
+
+		const totalDifficulty = cases.reduce((sum, c) => sum + c.difficulty, 0)
+		const withLabs = cases.filter(c => (c.bloodTest?.length || 0) + (c.biochemTest?.length || 0) + (c.urineTest?.length || 0) > 0).length
+		const withAuthors = cases.filter(c => !!c.authorName).length
+
+		return {
+			total: cases.length,
+			avgDifficulty: totalDifficulty / cases.length,
+			withLabs,
+			withAuthors,
+		}
+	}, [cases])
+
+	const hasActiveFilters = search.trim().length > 0 || categoryFilter !== 'all' || difficultyFilter !== 'all'
+	const activeCaseTimeLimit = getEmergencyTimeLimit(activeCase)
+	const urgencyThreshold = Math.max(15, Math.floor(activeCaseTimeLimit / 3))
+
+	const emergencyWindowLabel = useMemo(() => {
+		if (cases.length === 0) {
+			return formatTime(DEFAULT_EMERGENCY_TIME)
+		}
+
+		const limits = cases.map(c => getEmergencyTimeLimit(c))
+		const min = Math.min(...limits)
+		const max = Math.max(...limits)
+		return min === max ? formatTime(min) : `${formatTime(min)} - ${formatTime(max)}`
+	}, [cases])
 
 	useEffect(() => {
 		if (timerRunning && timeLeft > 0) {
@@ -73,7 +142,7 @@ export default function EmergencyPage() {
 				diagnosis: diagnosis || 'Vaqt tugadi',
 				treatment: treatment || 'Vaqt tugadi',
 				selectedTests: [],
-				timeSpent: EMERGENCY_TIME,
+				timeSpent: activeCaseTimeLimit,
 			})
 			setResult(res.result)
 		} catch { /* silent */ }
@@ -82,9 +151,10 @@ export default function EmergencyPage() {
 	const startCase = async (c: BackendCase) => {
 		try {
 			const res = await api.attempts.start(c._id)
+			const timeLimit = getEmergencyTimeLimit(c)
 			setActiveCase(c)
 			setAttemptId(res.attempt._id)
-			setTimeLeft(EMERGENCY_TIME)
+			setTimeLeft(timeLimit)
 			setTimerRunning(true)
 			setResult(null)
 			setDiagnosis('')
@@ -101,7 +171,7 @@ export default function EmergencyPage() {
 		setSubmitting(true)
 		clearInterval(timerRef.current!)
 		setTimerRunning(false)
-		const spent = EMERGENCY_TIME - timeLeft
+		const spent = activeCaseTimeLimit - timeLeft
 		try {
 			const res = await api.attempts.submit(attemptId, {
 				diagnosis,
@@ -173,7 +243,7 @@ export default function EmergencyPage() {
 						<div className='p-2.5 bg-accent/10 rounded-xl'><Zap className='w-6 h-6 text-accent' /></div>
 						<div>
 							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>Shoshilinch rejim</h1>
-							<p className='text-text-secondary text-sm'>Vaqt chegarasi: {formatTime(EMERGENCY_TIME)} · Har bir holat uchun</p>
+							<p className='text-text-secondary text-sm'>Vaqt chegarasi: {emergencyWindowLabel} · Holatga qarab</p>
 						</div>
 					</motion.div>
 
@@ -182,12 +252,12 @@ export default function EmergencyPage() {
 						{activeCase && !result && (
 							<motion.div key='case' initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className='space-y-4'>
 								{/* Timer */}
-								<div className={`flex items-center justify-between p-4 rounded-2xl border-2 ${timeLeft <= 60 ? 'bg-accent/10 border-accent/40' : 'bg-surface border-border'}`}>
+								<div className={`flex items-center justify-between p-4 rounded-2xl border-2 ${timeLeft <= urgencyThreshold ? 'bg-accent/10 border-accent/40' : 'bg-surface border-border'}`}>
 									<div className='flex items-center gap-2'>
-										<Clock className={`w-5 h-5 ${timeLeft <= 60 ? 'text-accent animate-pulse' : 'text-primary'}`} />
+										<Clock className={`w-5 h-5 ${timeLeft <= urgencyThreshold ? 'text-accent animate-pulse' : 'text-primary'}`} />
 										<span className='text-sm text-text-secondary'>Qolgan vaqt</span>
 									</div>
-									<span className={`text-2xl font-bold tabular-nums ${timeLeft <= 60 ? 'text-accent' : 'text-text-primary'}`}>
+									<span className={`text-2xl font-bold tabular-nums ${timeLeft <= urgencyThreshold ? 'text-accent' : 'text-text-primary'}`}>
 										{formatTime(timeLeft)}
 									</span>
 								</div>
@@ -199,8 +269,36 @@ export default function EmergencyPage() {
 										<div>
 											<p className='text-xs text-accent font-medium uppercase tracking-wide mb-1'>Shoshilinch holat</p>
 											<h2 className='text-lg font-bold text-text-primary'>{activeCase.title}</h2>
+											<p className='text-xs text-text-secondary mt-1'>
+												Muallif: <span className='text-text-primary font-medium'>{activeCase.authorName || 'Noma\'lum'}</span>
+											</p>
 										</div>
 									</div>
+
+									{((activeCase.instrumentalTests?.length ?? 0) > 0 || (activeCase.laboratoryTests?.length ?? 0) > 0) && (
+										<div className='mb-4 space-y-2'>
+											{(activeCase.instrumentalTests?.length ?? 0) > 0 && (
+												<div className='flex flex-wrap gap-1.5'>
+													<span className='text-[10px] uppercase tracking-wider text-text-secondary'>Instrumental:</span>
+													{(activeCase.instrumentalTests ?? []).map(test => (
+														<span key={test} className='text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20'>
+															{test}
+														</span>
+													))}
+												</div>
+											)}
+											{(activeCase.laboratoryTests?.length ?? 0) > 0 && (
+												<div className='flex flex-wrap gap-1.5'>
+													<span className='text-[10px] uppercase tracking-wider text-text-secondary'>Laborator:</span>
+													{(activeCase.laboratoryTests ?? []).map(test => (
+														<span key={test} className='text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/20'>
+															{test}
+														</span>
+													))}
+												</div>
+											)}
+										</div>
+									)}
 									<div className='grid grid-cols-2 gap-3 mb-4 text-sm'>
 										{activeCase.patient && (
 											<>
@@ -221,10 +319,10 @@ export default function EmergencyPage() {
 											</div>
 										)}
 									</div>
-{activeCase.patient?.history && (
-									<div className='mb-4'>
-										<p className='text-xs text-text-secondary mb-1'>Kasallik tarixi</p>
-										<p className='text-sm text-text-primary bg-surface-light rounded-xl p-3'>{activeCase.patient.history}</p>
+									{activeCase.patient?.history && (
+										<div className='mb-4'>
+											<p className='text-xs text-text-secondary mb-1'>Kasallik tarixi</p>
+											<p className='text-sm text-text-primary bg-surface-light rounded-xl p-3'>{activeCase.patient.history}</p>
 										</div>
 									)}
 
@@ -291,8 +389,98 @@ export default function EmergencyPage() {
 
 						{/* Case list */}
 						{!activeCase && !result && (
-							<motion.div key='list' initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-								{error && <p className='text-accent text-sm mb-4'>{error}</p>}
+							<motion.div key='list' initial={{ opacity: 0 }} animate={{ opacity: 1 }} className='space-y-4'>
+								{error && <p className='text-accent text-sm'>{error}</p>}
+
+								{cases.length > 0 && (
+									<>
+										<div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+											<div className='rounded-2xl border border-border bg-surface p-3'>
+												<p className='text-xs text-text-secondary mb-1'>Jami holat</p>
+												<p className='text-xl font-bold text-text-primary'>{emergencyStats.total}</p>
+											</div>
+											<div className='rounded-2xl border border-border bg-surface p-3'>
+												<p className='text-xs text-text-secondary mb-1'>Filtrlangan</p>
+												<p className='text-xl font-bold text-text-primary'>{filteredCases.length}</p>
+											</div>
+											<div className='rounded-2xl border border-border bg-surface p-3'>
+												<p className='text-xs text-text-secondary mb-1'>O&apos;rt. qiyinlik</p>
+												<p className='text-xl font-bold text-text-primary'>{emergencyStats.avgDifficulty.toFixed(1)}</p>
+											</div>
+											<div className='rounded-2xl border border-border bg-surface p-3'>
+												<p className='text-xs text-text-secondary mb-1'>Muallif biriktirilgan</p>
+												<p className='text-xl font-bold text-text-primary'>{emergencyStats.withAuthors}</p>
+											</div>
+										</div>
+
+										<Card hover={false}>
+											<div className='flex items-center justify-between mb-3'>
+												<div className='flex items-center gap-2 text-sm font-semibold text-text-primary'>
+													<Filter className='w-4 h-4 text-accent' />
+													Filtrlash
+												</div>
+												{hasActiveFilters && (
+													<button
+														type='button'
+														onClick={() => {
+															setSearch('')
+															setCategoryFilter('all')
+															setDifficultyFilter('all')
+														}}
+														className='text-xs text-text-secondary hover:text-text-primary'
+													>
+														Tozalash
+													</button>
+												)}
+											</div>
+
+											<div className='grid gap-3 sm:grid-cols-3'>
+												<div className='sm:col-span-1'>
+													<label className='text-xs text-text-secondary mb-1 block'>Qidiruv</label>
+													<div className='relative'>
+														<Search className='w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2' />
+														<input
+															type='text'
+															value={search}
+															onChange={(e) => setSearch(e.target.value)}
+															placeholder='Nomi, shikoyat, muallif...'
+															className='w-full bg-surface-light border border-border rounded-xl pl-9 pr-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50'
+														/>
+													</div>
+												</div>
+
+												<div>
+													<label className='text-xs text-text-secondary mb-1 block'>Kategoriya</label>
+													<select
+														value={categoryFilter}
+														onChange={(e) => setCategoryFilter(e.target.value)}
+														className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50'
+													>
+														<option value='all'>Barchasi</option>
+														{categories.map(category => (
+															<option key={category} value={category}>{category}</option>
+														))}
+													</select>
+												</div>
+
+												<div>
+													<label className='text-xs text-text-secondary mb-1 block'>Murakkablik</label>
+													<select
+														value={difficultyFilter}
+														onChange={(e) => setDifficultyFilter(e.target.value as 'all' | 'easy' | 'medium' | 'hard')}
+														className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50'
+													>
+														<option value='all'>Barchasi</option>
+														<option value='easy'>Oson</option>
+														<option value='medium'>O&apos;rta</option>
+														<option value='hard'>Qiyin</option>
+													</select>
+												</div>
+											</div>
+										</Card>
+									</>
+								)}
+
 								{cases.length === 0 && !loading ? (
 									<Card hover={false}>
 										<div className='text-center py-10 space-y-3'>
@@ -301,28 +489,61 @@ export default function EmergencyPage() {
 											<p className='text-text-secondary text-sm'>Hozircha shoshilinch type ga tegishli klinik holatlar mavjud emas</p>
 										</div>
 									</Card>
+								) : filteredCases.length === 0 ? (
+									<Card hover={false}>
+										<div className='text-center py-10 space-y-3'>
+											<Activity className='w-12 h-12 text-text-secondary/30 mx-auto' />
+											<p className='text-text-primary font-semibold'>Mos holat topilmadi</p>
+											<p className='text-text-secondary text-sm'>Filtrlarni o&apos;zgartirib qayta urinib ko&apos;ring.</p>
+										</div>
+									</Card>
 								) : (
 									<div className='space-y-3'>
-										{cases.map(c => (
+										{filteredCases.map(c => (
 											<motion.div key={c._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
 												<Card>
 													<div className='flex items-start justify-between gap-4'>
 														<div className='min-w-0 flex-1'>
-															<div className='flex items-center gap-2 mb-1'>
+															<div className='flex flex-wrap items-center gap-2 mb-1.5'>
 																<span className='text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full font-medium'>Shoshilinch</span>
+																<span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+																	c.difficulty >= 4
+																		? 'bg-accent/10 text-accent'
+																		: c.difficulty === 3
+																			? 'bg-yellow-500/10 text-yellow-600'
+																			: 'bg-primary/10 text-primary'
+																}`}>
+																	{c.difficulty >= 4 ? 'Qiyin' : c.difficulty === 3 ? 'O\'rta' : 'Oson'}
+																</span>
 																<span className='text-xs text-text-secondary capitalize'>{c.category}</span>
 															</div>
-															<h3 className='font-semibold text-text-primary mb-1 truncate'>{c.title}</h3>
-															{c.patient?.complaints && <p className='text-xs text-text-secondary truncate'>{c.patient.complaints}</p>}
+															<h3 className='font-semibold text-text-primary mb-1'>{c.title}</h3>
+															<p className='text-xs text-text-secondary line-clamp-2'>
+																{c.patient?.complaints || 'Shikoyatlar kiritilmagan'}
+															</p>
+															<p className='text-xs text-text-secondary flex items-center gap-1 mt-2'>
+																<User className='w-3 h-3' />
+																{c.authorName || 'Noma\'lum muallif'}
+															</p>
 														</div>
-														<button onClick={() => startCase(c)}
-															className='flex items-center gap-2 bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-xl transition-all text-sm shrink-0'>
+														<button
+															onClick={() => startCase(c)}
+															className='flex items-center gap-2 bg-accent hover:bg-accent/90 text-white font-semibold px-4 py-2 rounded-xl transition-all text-sm shrink-0'
+														>
 															<Zap className='w-4 h-4' /> Boshlash
 														</button>
 													</div>
-													<div className='flex items-center gap-3 mt-3 pt-3 border-t border-border text-xs text-text-secondary'>
-														<div className='flex items-center gap-1'><Clock className='w-3 h-3' />{formatTime(EMERGENCY_TIME)}</div>
-														{c.patient && <span>{c.patient.age} yosh</span>}
+
+													<div className='flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border text-xs text-text-secondary'>
+														<div className='flex items-center gap-1 rounded-full bg-surface-light px-2 py-0.5'>
+															<Clock className='w-3 h-3' />
+															{formatTime(getEmergencyTimeLimit(c))}
+														</div>
+														{getEmergencyTimeLimit(c) <= 120 && <span className='rounded-full bg-accent/10 text-accent px-2 py-0.5'>Express qaror</span>}
+														{c.patient && <span className='rounded-full bg-surface-light px-2 py-0.5'>{c.patient.age} yosh</span>}
+														<span className='rounded-full bg-surface-light px-2 py-0.5'>{c.mediaItems?.length ?? 0} ta media</span>
+														{(c.instrumentalTests?.length ?? 0) > 0 && <span className='rounded-full bg-primary/10 text-primary px-2 py-0.5'>Inst: {c.instrumentalTests?.length}</span>}
+														{(c.laboratoryTests?.length ?? 0) > 0 && <span className='rounded-full bg-yellow-500/10 text-yellow-600 px-2 py-0.5'>Lab: {c.laboratoryTests?.length}</span>}
 													</div>
 												</Card>
 											</motion.div>

@@ -1,4 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const STORAGE_KEY = 'med-ai-auth'
+const AUTH_CHANGE_EVENT = 'med-ai-auth-changed'
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null
@@ -24,10 +26,33 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers })
-  const data = await res.json()
+
+  let data: unknown = null
+  try {
+    data = await res.json()
+  } catch {
+    data = null
+  }
 
   if (!res.ok) {
-    throw new Error(data.message || 'Server xatosi')
+    const message =
+      typeof data === 'object' && data !== null && 'message' in data
+        ? String((data as { message?: unknown }).message ?? '')
+        : ''
+
+    // Auto-reset stale sessions for protected endpoints.
+    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+      localStorage.removeItem(STORAGE_KEY)
+      window.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
+
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?reason=session-expired'
+      }
+
+      throw new Error('Sessiya muddati tugagan. Qayta tizimga kiring.')
+    }
+
+    throw new Error(message || 'Server xatosi')
   }
   return data as T
 }
@@ -257,7 +282,7 @@ export const api = {
 
   // ─── Cases API ────────────────────────────────────────────────
   cases: {
-    getAll: (params?: { category?: string; type?: string; difficulty?: number; search?: string; page?: number; limit?: number; status?: string }) => {
+    getAll: (params?: { category?: string; type?: string; difficulty?: number; search?: string; page?: number; limit?: number; status?: string; withMedia?: boolean }) => {
       const q = new URLSearchParams()
       if (params?.category) q.set('category', params.category)
       if (params?.type) q.set('type', params.type)
@@ -266,6 +291,7 @@ export const api = {
       if (params?.page) q.set('page', String(params.page))
       if (params?.limit) q.set('limit', String(params.limit))
       if (params?.status) q.set('status', params.status)
+      if (params?.withMedia !== undefined) q.set('withMedia', String(params.withMedia))
       return request<{ status: string; cases: BackendCase[]; total: number; totalPages: number; currentPage: number }>(`/cases?${q}`)
     },
 
@@ -405,6 +431,7 @@ export interface BackendCase {
   _id: string
   caseId: string
   title: string
+  authorName: string
   category: string
   difficulty: number
   type: 'diagnostika' | 'jarrohlik' | 'shoshilinch'
@@ -442,6 +469,8 @@ export interface BackendCase {
   urineTest?: Array<{
     name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical'
   }>
+  instrumentalTests?: Array<'ekg' | 'uzi' | 'rentgen' | 'kt' | 'mrt' | 'endoskopiya'>
+  laboratoryTests?: Array<'qon_analiz' | 'siydik_analiz' | 'bioximik'>
   correctDiagnosis: string
   correctTreatment: string
   tests: string[]

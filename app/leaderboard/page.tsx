@@ -1,13 +1,13 @@
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import Card from '@/components/ui/Card'
-import { api, LeaderboardEntry } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
-import { motion } from 'framer-motion'
-import { Clock, Medal, Star, Trophy, Users } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import Sidebar from '@/components/layout/Sidebar';
+import Card from '@/components/ui/Card';
+import { api, LeaderboardEntry } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { motion } from 'framer-motion';
+import { Clock, Medal, Star, Trophy, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: (i: number) => ({ opacity: 1, y: 0, transition: { duration: 0.4, delay: i * 0.04 } }) }
 
@@ -57,8 +57,30 @@ export default function LeaderboardPage() {
 
 	if (!user) return null
 
-	const top3 = list.slice(0, 3)
-	const rest = list.slice(3)
+	const studentList = useMemo(
+		() => list
+			.filter(entry => entry.role === 'student')
+			.map((entry, idx) => ({
+				...entry,
+				rank: idx + 1,
+				isCurrentUser: entry.userId === user.id || entry.isCurrentUser,
+			})),
+		[list, user.id],
+	)
+
+	const top3 = studentList.slice(0, 3)
+	const rest = studentList.slice(3)
+
+	const currentUserRank = useMemo(() => {
+		const inTop100 = studentList.find(entry => entry.isCurrentUser)
+		if (inTop100) return inTop100
+
+		if (myRank && myRank.role === 'student') {
+			return { ...myRank, isCurrentUser: true }
+		}
+
+		return null
+	}, [studentList, myRank])
 
 	return (
 		<div className='min-h-screen bg-secondary'>
@@ -87,11 +109,11 @@ export default function LeaderboardPage() {
 						<Card hover={false}>
 							<p className='text-center text-accent py-8'>{error}</p>
 						</Card>
-					) : list.length === 0 ? (
+					) : studentList.length === 0 ? (
 						<Card hover={false}>
 							<div className='text-center py-12 space-y-3'>
 								<Users className='w-12 h-12 text-text-secondary/30 mx-auto' />
-								<p className='text-text-primary font-semibold'>Hali hech kim klinik holat yechmagan</p>
+								<p className='text-text-primary font-semibold'>Hozircha studentlar reytingi bo&apos;sh</p>
 								<p className='text-text-secondary text-sm'>Birinchi bo&apos;ling!</p>
 								<button onClick={() => router.push('/cases')} className='bg-primary text-secondary font-semibold px-5 py-2 rounded-xl text-sm'>
 									Boshlash
@@ -147,19 +169,19 @@ export default function LeaderboardPage() {
 								</motion.div>
 							)}
 
-							{/* Current user's rank card (if not in top 100) */}
-							{myRank && !myRank.isCurrentUser && (
+							{/* Current user's rank card (always visible when available) */}
+							{currentUserRank && (
 								<motion.div initial='hidden' animate='visible' custom={2} variants={fadeIn}>
 									<Card hover={false} className='border-primary/40'>
 										<div className='flex items-center gap-3'>
-											<span className='text-2xl font-black text-primary w-8 shrink-0'>#{myRank.rank}</span>
-											<Avatar name={myRank.name} avatar={myRank.avatar} />
+											<span className='text-2xl font-black text-primary w-8 shrink-0'>#{currentUserRank.rank}</span>
+											<Avatar name={currentUserRank.name} avatar={currentUserRank.avatar} />
 											<div className='flex-1 min-w-0'>
-												<p className='font-semibold text-primary truncate'>{myRank.name} (Siz)</p>
-												<p className='text-xs text-text-secondary'>{myRank.totalCompleted} ta klinik holat</p>
+												<p className='font-semibold text-primary truncate'>{currentUserRank.name} (Siz)</p>
+												<p className='text-xs text-text-secondary'>Sizning o&apos;rningiz: #{currentUserRank.rank} · {currentUserRank.totalCompleted} ta klinik holat</p>
 											</div>
 											<div className='text-right shrink-0'>
-												<p className='font-bold text-text-primary'>{myRank.avgScore}%</p>
+												<p className='font-bold text-text-primary'>{currentUserRank.avgScore}%</p>
 												<p className='text-xs text-text-secondary'>o&apos;rtacha</p>
 											</div>
 										</div>
@@ -180,7 +202,7 @@ export default function LeaderboardPage() {
 									</div>
 
 									<div className='divide-y divide-border'>
-										{list.map((entry, idx) => (
+										{studentList.map((entry, idx) => (
 											<motion.div
 												key={entry.userId}
 												initial='hidden'
@@ -191,7 +213,7 @@ export default function LeaderboardPage() {
 											>
 												{/* Rank */}
 												<span className={`text-sm font-bold w-6 text-center ${idx < 3 ? MEDAL_COLORS[idx] : 'text-text-secondary'}`}>
-													{idx + 1}
+													{entry.rank}
 												</span>
 
 												{/* User */}

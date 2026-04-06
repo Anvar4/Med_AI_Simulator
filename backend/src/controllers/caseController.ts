@@ -1,7 +1,24 @@
-import { Request, Response } from 'express'
-import { AuthRequest } from '../middleware/auth'
-import { Case } from '../models/Case'
-import { Category } from '../models/Category'
+import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
+import { Case } from '../models/Case';
+import { Category } from '../models/Category';
+
+const INSTRUMENTAL_TESTS = ['ekg', 'uzi', 'rentgen', 'kt', 'mrt', 'endoskopiya'] as const
+const LABORATORY_TESTS = ['qon_analiz', 'siydik_analiz', 'bioximik'] as const
+
+function sanitizeEnumList<T extends string>(input: unknown, allowed: readonly T[]): T[] {
+  if (!Array.isArray(input)) return []
+  const allowedSet = new Set(allowed)
+  const unique = new Set<string>()
+
+  for (const value of input) {
+    if (typeof value !== 'string') continue
+    const normalized = value.trim() as T
+    if (allowedSet.has(normalized)) unique.add(normalized)
+  }
+
+  return Array.from(unique) as T[]
+}
 
 export const getAllCases = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -11,11 +28,12 @@ export const getAllCases = async (req: Request, res: Response): Promise<void> =>
       difficulty,
       search,
       status,
+      withMedia,
       page = '1',
       limit = '12',
     } = req.query
 
-    const filter: Record<string, string | number | { $regex: string; $options: string }> = {}
+    const filter: Record<string, unknown> = {}
 
     if (category && category !== 'Barchasi') {
       filter.category = category as string
@@ -31,6 +49,9 @@ export const getAllCases = async (req: Request, res: Response): Promise<void> =>
     }
     if (status) {
       filter.status = status as string
+    }
+    if (withMedia === 'true' || withMedia === '1') {
+      filter['mediaItems.0'] = { $exists: true }
     }
 
     const pageNum = Math.max(1, parseInt(page as string))
@@ -105,9 +126,30 @@ export const getCategories = async (_req: Request, res: Response): Promise<void>
 
 export const createCase = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const mediaItems = Array.isArray(req.body.mediaItems) ? req.body.mediaItems : []
+    if (mediaItems.length === 0) {
+      res.status(400).json({ message: 'Har bir klinik holat uchun kamida bitta rasm yoki grafik media bo\'lishi shart' })
+      return
+    }
+
+    const authorName = typeof req.body.authorName === 'string' && req.body.authorName.trim().length > 0
+      ? req.body.authorName.trim()
+      : (req.user?.name || '').trim()
+
+    if (!authorName) {
+      res.status(400).json({ message: 'Muallif nomi majburiy' })
+      return
+    }
+
+    const instrumentalTests = sanitizeEnumList(req.body.instrumentalTests, INSTRUMENTAL_TESTS)
+    const laboratoryTests = sanitizeEnumList(req.body.laboratoryTests, LABORATORY_TESTS)
+
     const caseData = {
       ...req.body,
       createdBy: req.user!._id,
+      authorName,
+      instrumentalTests,
+      laboratoryTests,
     }
 
     const newCase = await Case.create(caseData)
@@ -123,9 +165,32 @@ export const createCase = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateCase = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const payload: Record<string, unknown> = { ...req.body }
+
+    if (Array.isArray(payload.mediaItems) && payload.mediaItems.length === 0) {
+      res.status(400).json({ message: 'Klinik holatda media bo\'limi bo\'sh bo\'lishi mumkin emas' })
+      return
+    }
+
+    if ('authorName' in payload) {
+      const incoming = typeof payload.authorName === 'string' ? payload.authorName.trim() : ''
+      payload.authorName = incoming || (req.user?.name || '').trim()
+    }
+
+    if ('instrumentalTests' in payload) {
+      payload.instrumentalTests = sanitizeEnumList(payload.instrumentalTests, INSTRUMENTAL_TESTS)
+    }
+
+    if ('laboratoryTests' in payload) {
+      payload.laboratoryTests = sanitizeEnumList(payload.laboratoryTests, LABORATORY_TESTS)
+    }
+
+    const id = req.params.id as string
+    const filter = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { caseId: id }
+
     const updated = await Case.findOneAndUpdate(
-      { caseId: req.params.id },
-      req.body,
+      filter,
+      payload,
       { new: true, runValidators: true }
     )
 
@@ -142,7 +207,9 @@ export const updateCase = async (req: AuthRequest, res: Response): Promise<void>
 
 export const deleteCase = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const deleted = await Case.findOneAndDelete({ caseId: req.params.id })
+    const id = req.params.id as string
+    const filter = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { caseId: id }
+    const deleted = await Case.findOneAndDelete(filter)
 
     if (!deleted) {
       res.status(404).json({ message: 'Keys topilmadi' })

@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from 'mongoose'
+import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IMediaItem {
   type: 'xray' | 'ekg' | 'echo' | 'image' | 'video'
@@ -18,6 +18,7 @@ export interface ILabResult {
 export interface ICase extends Document {
   caseId: string
   title: string
+  authorName: string
   category: string
   difficulty: number
   type: 'diagnostika' | 'jarrohlik' | 'shoshilinch'
@@ -42,6 +43,8 @@ export interface ICase extends Document {
   bloodTest?: ILabResult[]         // Qon tahlili
   biochemTest?: ILabResult[]       // Bioximik tahlil
   urineTest?: ILabResult[]         // Siydik tahlili
+  instrumentalTests?: Array<'ekg' | 'uzi' | 'rentgen' | 'kt' | 'mrt' | 'endoskopiya'>
+  laboratoryTests?: Array<'qon_analiz' | 'siydik_analiz' | 'bioximik'>
   correctDiagnosis: string
   correctTreatment: string
   tests: string[]
@@ -71,6 +74,7 @@ const caseSchema = new Schema<ICase>(
   {
     caseId: { type: String, required: true, unique: true },
     title: { type: String, required: true },
+    authorName: { type: String, required: true, trim: true, index: true },
     category: { type: String, required: true, index: true },
     difficulty: { type: Number, required: true, min: 1, max: 5 },
     type: {
@@ -100,6 +104,14 @@ const caseSchema = new Schema<ICase>(
     bloodTest: [labResultSchema],
     biochemTest: [labResultSchema],
     urineTest: [labResultSchema],
+    instrumentalTests: [{
+      type: String,
+      enum: ['ekg', 'uzi', 'rentgen', 'kt', 'mrt', 'endoskopiya'],
+    }],
+    laboratoryTests: [{
+      type: String,
+      enum: ['qon_analiz', 'siydik_analiz', 'bioximik'],
+    }],
     correctDiagnosis: { type: String, required: true },
     correctTreatment: { type: String, required: true },
     tests: [String],

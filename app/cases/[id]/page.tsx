@@ -19,21 +19,29 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const fadeIn = {
 	hidden: { opacity: 0, y: 20 },
 	visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 }
 
-const additionalTests = [
+const INSTRUMENTAL_TEST_OPTIONS = [
 	{ id: 'ekg', label: 'EKG' },
-	{ id: 'ct', label: 'KT / Kompyuter Tomografiya' },
-	{ id: 'blood', label: 'Qon tahlili (umumiy)' },
-	{ id: 'biochem', label: 'Bioximik tahlil' },
-	{ id: 'urine', label: 'Siydik tahlili' },
-	{ id: 'echo', label: 'EXO-KG' },
-]
+	{ id: 'uzi', label: 'UZI (Ultratovush tekshiruvi)' },
+	{ id: 'rentgen', label: 'Rentgen' },
+	{ id: 'kt', label: 'KT' },
+	{ id: 'mrt', label: 'MRT' },
+	{ id: 'endoskopiya', label: 'Endoskopiya' },
+] as const
+
+const LABORATORY_TEST_OPTIONS = [
+	{ id: 'qon_analiz', label: 'Qon analiz' },
+	{ id: 'siydik_analiz', label: 'Siydik analiz' },
+	{ id: 'bioximik', label: 'Bioximik analiz' },
+] as const
+
+const XRAY_GROUP_IDS = new Set(['rentgen', 'kt', 'mrt'])
 
 export default function CaseDetailPage() {
 	const params = useParams()
@@ -45,6 +53,7 @@ export default function CaseDetailPage() {
 
 	const [attemptId, setAttemptId] = useState<string | null>(null)
 	const [started, setStarted] = useState(false)
+	const [startingAttempt, setStartingAttempt] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
 
 	const [selectedTests, setSelectedTests] = useState<string[]>([])
@@ -61,7 +70,9 @@ export default function CaseDetailPage() {
 
 	// Timer
 	const [elapsed, setElapsed] = useState(0)
+	const [timerRunning, setTimerRunning] = useState(false)
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+	const autoStartDoneRef = useRef(false)
 
 	useEffect(() => {
 		api.cases.getById(caseId)
@@ -71,28 +82,40 @@ export default function CaseDetailPage() {
 	}, [caseId])
 
 	useEffect(() => {
-		if (started) {
-			timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+		if (!timerRunning) return
+		timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+		return () => {
+			if (timerRef.current) clearInterval(timerRef.current)
 		}
-		return () => { if (timerRef.current) clearInterval(timerRef.current) }
-	}, [started])
+	}, [timerRunning])
 
 	const displayMinutes = Math.floor(elapsed / 60)
 	const displaySeconds = elapsed % 60
 
-	const handleStart = async () => {
-		if (!caseData) return
+	const handleStart = useCallback(async () => {
+		if (!caseData || started || attemptId || startingAttempt) return
+		setStartingAttempt(true)
 		try {
 			const res = await api.attempts.start(caseData._id)
 			setAttemptId(res.attempt._id)
 			setStarted(true)
+			setTimerRunning(true)
 		} catch {
 			setError("Boshlashda xatolik yuz berdi")
+		} finally {
+			setStartingAttempt(false)
 		}
-	}
+	}, [attemptId, caseData, started, startingAttempt])
+
+	useEffect(() => {
+		if (!caseData || started || attemptId || autoStartDoneRef.current) return
+		autoStartDoneRef.current = true
+		void handleStart()
+	}, [caseData, started, attemptId, handleStart])
 
 	const handleSubmit = async () => {
 		if (!attemptId) return
+		setTimerRunning(false)
 		setSubmitting(true)
 		try {
 			const res = await api.attempts.submit(attemptId, {
@@ -111,9 +134,9 @@ export default function CaseDetailPage() {
 			setResultWeaknesses(res.result?.weaknesses ?? [])
 			setResultDetailedAnalysis(res.result?.detailedAnalysis ?? '')
 			setShowResult(true)
-			if (timerRef.current) clearInterval(timerRef.current)
 		} catch {
 			setError("Yuborishda xatolik yuz berdi")
+			setTimerRunning(true)
 		} finally {
 			setSubmitting(false)
 		}
@@ -147,6 +170,37 @@ export default function CaseDetailPage() {
 	const bloodTestData = caseData?.bloodTest ?? []
 	const biochemTestData = caseData?.biochemTest ?? []
 	const urineTestData = caseData?.urineTest ?? []
+
+	const fallbackInstrumentalTests = [
+		...(ekgMedia.length > 0 ? ['ekg'] : []),
+		...(echoMedia.length > 0 ? ['uzi'] : []),
+		...(xrayMedia.length > 0 ? ['rentgen'] : []),
+		...(otherMedia.length > 0 ? ['endoskopiya'] : []),
+	]
+
+	const availableInstrumentalTests = (caseData?.instrumentalTests && caseData.instrumentalTests.length > 0
+		? caseData.instrumentalTests
+		: fallbackInstrumentalTests
+	).filter((v, i, arr) => arr.indexOf(v) === i)
+
+	const fallbackLaboratoryTests = [
+		...(bloodTestData.length > 0 ? ['qon_analiz'] : []),
+		...(urineTestData.length > 0 ? ['siydik_analiz'] : []),
+		...(biochemTestData.length > 0 ? ['bioximik'] : []),
+		...(labResults.length > 0 ? ['qon_analiz'] : []),
+	]
+
+	const availableLaboratoryTests = (caseData?.laboratoryTests && caseData.laboratoryTests.length > 0
+		? caseData.laboratoryTests
+		: fallbackLaboratoryTests
+	).filter((v, i, arr) => arr.indexOf(v) === i)
+
+	const showXrayResults = selectedTests.some(testId => XRAY_GROUP_IDS.has(testId))
+	const showUziResults = selectedTests.includes('uzi')
+	const showQonAnaliz = selectedTests.includes('qon_analiz')
+	const showSiydikAnaliz = selectedTests.includes('siydik_analiz')
+	const showBioximik = selectedTests.includes('bioximik')
+	const showEndoscopy = selectedTests.includes('endoskopiya')
 
 	if (loading) {
 		return (
@@ -212,6 +266,9 @@ export default function CaseDetailPage() {
 							<h1 className='text-xl sm:text-2xl font-bold text-text-primary'>
 								{caseData.title}
 							</h1>
+							<p className='text-xs text-text-secondary mt-1'>
+								Muallif: <span className='text-text-primary font-medium'>{caseData.authorName || 'Noma\'lum'}</span>
+							</p>
 						</div>
 					</motion.div>
 
@@ -288,18 +345,18 @@ export default function CaseDetailPage() {
 								</div>
 							</Card>
 
-							{/* Medical Media - always show non-diagnostic media */}
-							{otherMedia.length > 0 && (
+							{/* Endoskopiya media */}
+							{showEndoscopy && otherMedia.length > 0 && (
 								<Card hover={false}>
-									<h3 className='text-sm font-semibold text-text-primary mb-4'>Tibbiy rasmlar</h3>
+									<h3 className='text-sm font-semibold text-text-primary mb-4'>Endoskopiya natijalari</h3>
 									<MediaViewer mediaItems={otherMedia} />
 								</Card>
 							)}
 
 							{/* KT / Rentgen */}
-							{selectedTests.includes('ct') && xrayMedia.length > 0 && (
+							{showXrayResults && xrayMedia.length > 0 && (
 								<Card hover={false}>
-									<h3 className='text-sm font-semibold text-text-primary mb-4'>KT / Rentgen natijalari</h3>
+									<h3 className='text-sm font-semibold text-text-primary mb-4'>Rentgen / KT / MRT natijalari</h3>
 									<MediaViewer mediaItems={xrayMedia} />
 								</Card>
 							)}
@@ -313,41 +370,41 @@ export default function CaseDetailPage() {
 							)}
 
 							{/* EXO */}
-							{selectedTests.includes('echo') && echoMedia.length > 0 && (
+							{showUziResults && echoMedia.length > 0 && (
 								<Card hover={false}>
-									<h3 className='text-sm font-semibold text-text-primary mb-4'>EXO natijalari</h3>
+									<h3 className='text-sm font-semibold text-text-primary mb-4'>UZI natijalari</h3>
 									<MediaViewer mediaItems={echoMedia} />
 								</Card>
 							)}
 
 							{/* Qon tahlili */}
-							{selectedTests.includes('blood') && bloodTestData.length > 0 && (
+							{showQonAnaliz && bloodTestData.length > 0 && (
 								<Card hover={false}>
 									<div className='flex items-center gap-2 mb-4'>
 										<TestTube className='w-4 h-4 text-primary' />
-										<h3 className='text-sm font-semibold text-text-primary'>Qon tahlili (umumiy)</h3>
+										<h3 className='text-sm font-semibold text-text-primary'>Qon analiz</h3>
 									</div>
 									<LabResults results={bloodTestData} />
 								</Card>
 							)}
 
 							{/* Bioximik tahlil */}
-							{selectedTests.includes('biochem') && biochemTestData.length > 0 && (
+							{showBioximik && biochemTestData.length > 0 && (
 								<Card hover={false}>
 									<div className='flex items-center gap-2 mb-4'>
 										<TestTube className='w-4 h-4 text-primary' />
-										<h3 className='text-sm font-semibold text-text-primary'>Bioximik tahlil</h3>
+										<h3 className='text-sm font-semibold text-text-primary'>Bioximik analiz</h3>
 									</div>
 									<LabResults results={biochemTestData} />
 								</Card>
 							)}
 
 							{/* Siydik tahlili */}
-							{selectedTests.includes('urine') && urineTestData.length > 0 && (
+							{showSiydikAnaliz && urineTestData.length > 0 && (
 								<Card hover={false}>
 									<div className='flex items-center gap-2 mb-4'>
 										<TestTube className='w-4 h-4 text-primary' />
-										<h3 className='text-sm font-semibold text-text-primary'>Siydik tahlili</h3>
+										<h3 className='text-sm font-semibold text-text-primary'>Siydik analiz</h3>
 									</div>
 									<LabResults results={urineTestData} />
 								</Card>
@@ -390,7 +447,29 @@ export default function CaseDetailPage() {
 								</div>
 
 								{/* Steps Progress */}
-								<div className='flex items-center gap-2'>
+								<div className='grid grid-cols-2 gap-2 sm:hidden'>
+									{steps.map(step => (
+										<div
+											key={step.id}
+											className={`flex items-center gap-2 rounded-xl px-2.5 py-2 border ${
+												step.done
+													? 'border-success/30 bg-success/10'
+													: 'border-border bg-surface-light'
+											}`}
+										>
+											{step.done ? (
+												<CheckCircle className='w-4 h-4 text-success shrink-0' />
+											) : (
+												<Circle className='w-4 h-4 text-text-secondary/30 shrink-0' />
+											)}
+											<span className={`text-xs font-medium truncate ${step.done ? 'text-success' : 'text-text-secondary'}`}>
+												{step.label}
+											</span>
+										</div>
+									))}
+								</div>
+
+								<div className='hidden sm:flex items-center gap-2'>
 									{steps.map((step, i) => (
 										<div
 											key={step.id}
@@ -422,28 +501,49 @@ export default function CaseDetailPage() {
 								</div>
 							</Card>
 
-							{/* Additional Tests */}
+							{/* Instrumental & Laboratory Menus */}
 							<Card hover={false}>
-								<h3 className='text-sm font-semibold text-text-primary mb-4'>
-									Qo&apos;shimcha tekshiruvlar
-								</h3>
-								<div className='space-y-2'>
-									{additionalTests.map(test => (
-										<label
-											key={test.id}
-											className='flex items-center gap-3 p-2 rounded-lg hover:bg-surface-light cursor-pointer transition-colors'
-										>
-											<input
-												type='checkbox'
-												checked={selectedTests.includes(test.id)}
-												onChange={() => toggleTest(test.id)}
-												className='w-4 h-4 rounded border-border bg-surface accent-primary'
-											/>
-											<span className='text-sm text-text-secondary'>
-												{test.label}
-											</span>
-										</label>
-									))}
+								<h3 className='text-sm font-semibold text-text-primary mb-4'>Tekshiruv menyulari</h3>
+								<div className='space-y-3'>
+									<details className='bg-surface-light border border-border rounded-xl p-3'>
+										<summary className='cursor-pointer text-sm font-semibold text-text-primary'>Instrumental tekshiruvlar</summary>
+										<div className='mt-2 space-y-2'>
+											{INSTRUMENTAL_TEST_OPTIONS.filter(test => availableInstrumentalTests.includes(test.id)).map(test => (
+												<label key={test.id} className='flex items-center gap-3 p-2 rounded-lg hover:bg-surface cursor-pointer transition-colors'>
+													<input
+														type='checkbox'
+														checked={selectedTests.includes(test.id)}
+														onChange={() => toggleTest(test.id)}
+														className='w-4 h-4 rounded border-border bg-surface accent-primary'
+													/>
+													<span className='text-sm text-text-secondary'>{test.label}</span>
+												</label>
+											))}
+											{availableInstrumentalTests.length === 0 && (
+												<p className='text-xs text-text-secondary/60'>Bu klinik holat uchun instrumental ma&apos;lumot biriktirilmagan.</p>
+											)}
+										</div>
+									</details>
+
+									<details className='bg-surface-light border border-border rounded-xl p-3'>
+										<summary className='cursor-pointer text-sm font-semibold text-text-primary'>Laborator tekshiruvlar</summary>
+										<div className='mt-2 space-y-2'>
+											{LABORATORY_TEST_OPTIONS.filter(test => availableLaboratoryTests.includes(test.id)).map(test => (
+												<label key={test.id} className='flex items-center gap-3 p-2 rounded-lg hover:bg-surface cursor-pointer transition-colors'>
+													<input
+														type='checkbox'
+														checked={selectedTests.includes(test.id)}
+														onChange={() => toggleTest(test.id)}
+														className='w-4 h-4 rounded border-border bg-surface accent-primary'
+													/>
+													<span className='text-sm text-text-secondary'>{test.label}</span>
+												</label>
+											))}
+											{availableLaboratoryTests.length === 0 && (
+												<p className='text-xs text-text-secondary/60'>Bu klinik holat uchun laborator ma&apos;lumot biriktirilmagan.</p>
+											)}
+										</div>
+									</details>
 								</div>
 							</Card>
 
@@ -485,7 +585,7 @@ export default function CaseDetailPage() {
 									size='lg'
 									className='w-full'
 									onClick={handleSubmit}
-									disabled={submitting || !diagnosis.trim() || !treatment.trim()}
+									disabled={submitting || startingAttempt || !attemptId || !diagnosis.trim() || !treatment.trim()}
 								>
 									{submitting ? 'Baholanmoqda...' : 'AI Baholash →'}
 								</Button>

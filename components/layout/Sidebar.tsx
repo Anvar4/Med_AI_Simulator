@@ -1,9 +1,12 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context'
-import { AnimatePresence, motion } from 'framer-motion'
+import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+    Activity,
     BarChart3,
+    BookOpen,
     Brain,
     ChevronLeft,
     ChevronRight,
@@ -11,6 +14,7 @@ import {
     Home,
     LogOut,
     Menu,
+    PlayCircle,
     Settings,
     Shield,
     Stethoscope,
@@ -18,35 +22,28 @@ import {
     UserCog,
     X,
     Zap
-} from 'lucide-react'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+} from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 
 export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false)
 	const [mobileOpen, setMobileOpen] = useState(false)
-	const [mounted, setMounted] = useState(false)
 	const pathname = usePathname()
 	const { user, logout } = useAuth()
 	const router = useRouter()
-
-	useEffect(() => {
-		setMounted(true)
-	}, [])
-
-	// Close mobile sidebar on route change
-	useEffect(() => {
-		setMobileOpen(false)
-	}, [pathname])
 
 	const menuItems = useMemo(() => {
 		const items = [
 			{ href: '/dashboard', icon: Home, label: 'Dashboard' },
 			{ href: '/cases', icon: Stethoscope, label: 'Klinik holatlar' },
 			{ href: '/statistics', icon: BarChart3, label: 'Statistika' },
+			{ href: '/simulator', icon: Activity, label: '3D Simulator' },
+			{ href: '/kurslar', icon: PlayCircle, label: 'Kurslar' },
+			{ href: '/library', icon: BookOpen, label: 'Kutubxona' },
 		]
-		if (!mounted || !user || !canAccessContentManager(user.role)) {
+		if (!user || !canAccessContentManager(user.role)) {
 			items.push(
 				{ href: '/analysis', icon: Brain, label: 'Tahlil' },
 				{ href: '/leaderboard', icon: Trophy, label: 'Liderlar' },
@@ -54,14 +51,14 @@ export default function Sidebar() {
 			)
 		}
 		items.push({ href: '/subscription', icon: CreditCard, label: 'Obuna' })
-		if (mounted && user && canAccessContentManager(user.role)) {
+		if (user && canAccessContentManager(user.role)) {
 			items.push({ href: '/content-manager', icon: UserCog, label: 'Kontent' })
 		}
-		if (mounted && user && canAccessAdmin(user.role)) {
+		if (user && canAccessAdmin(user.role)) {
 			items.push({ href: '/admin', icon: Shield, label: 'Admin' })
 		}
 		return items
-	}, [user, mounted])
+	}, [user])
 
 	const handleLogout = () => {
 		logout()
@@ -80,9 +77,9 @@ export default function Sidebar() {
 					>
 						<Menu className='w-5 h-5' />
 					</button>
-					<img src='/logotip.png' alt='Med AI Simulator' className='h-14 w-auto object-contain' />
+					<img src='/logotip.png' alt='Med AI Simulator' className='h-10 sm:h-12 w-auto object-contain' />
 				</div>
-				{mounted && user && (
+				{user && (
 					<div className='flex items-center gap-2'>
 						<div className='text-right'>
 							<p className='text-xs font-semibold text-text-primary'>{user.name}</p>
@@ -118,11 +115,11 @@ export default function Sidebar() {
 							animate={{ x: 0 }}
 							exit={{ x: '-100%' }}
 							transition={{ duration: 0.25, ease: 'easeInOut' }}
-							className='lg:hidden fixed left-0 top-0 h-screen w-72 z-50 bg-surface border-r border-border flex flex-col'
+							className='lg:hidden fixed left-0 top-0 h-dvh w-[86vw] max-w-72 z-50 bg-surface border-r border-border flex flex-col'
 						>
 							{/* Drawer header */}
 							<div className='flex items-center justify-between px-4 h-16 border-b border-border shrink-0'>
-				<img src='/logotip.png' alt='Med AI Simulator' className='h-14 w-auto object-contain' />
+				<img src='/logotip.png' alt='Med AI Simulator' className='h-10 sm:h-12 w-auto object-contain' />
 								<button
 									onClick={() => setMobileOpen(false)}
 									className='p-2 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-colors'
@@ -140,6 +137,7 @@ export default function Sidebar() {
 										<Link
 											key={item.label}
 											href={item.href}
+											onClick={() => setMobileOpen(false)}
 											className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
 												active
 													? 'bg-primary/10 text-primary'
@@ -155,7 +153,7 @@ export default function Sidebar() {
 
 							{/* Drawer footer */}
 							<div className='py-4 px-3 border-t border-border space-y-1 shrink-0'>
-								{mounted && user && (
+								{user && (
 									<div className='flex items-center gap-3 px-3 py-3 mb-2 rounded-xl bg-surface-light/50'>
 										<div className='w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0 text-primary font-bold text-sm overflow-hidden'>
 											{user.avatar
@@ -171,6 +169,7 @@ export default function Sidebar() {
 								)}
 								<Link
 									href='/settings'
+									onClick={() => setMobileOpen(false)}
 									className='flex items-center gap-3 px-3 py-2.5 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all duration-200'
 								>
 									<Settings className='w-5 h-5 shrink-0' />
@@ -193,7 +192,7 @@ export default function Sidebar() {
 			<motion.aside
 				animate={{ width: collapsed ? 72 : 256 }}
 				transition={{ duration: 0.3, ease: 'easeInOut' }}
-				className='hidden lg:flex flex-col fixed left-0 top-0 h-screen bg-surface border-r border-border z-40'
+				className='hidden lg:flex flex-col fixed left-0 top-0 h-dvh bg-surface border-r border-border z-40'
 			>
 				<div className='flex items-center justify-center px-4 h-16 border-b border-border overflow-hidden'>
 					{collapsed ? (
@@ -236,7 +235,7 @@ export default function Sidebar() {
 
 				<div className='py-4 px-3 border-t border-border space-y-1'>
 					{/* User Profile */}
-					{mounted && user && (
+					{user && (
 						<div className={`flex items-center gap-3 px-3 py-3 mb-2 rounded-xl bg-surface-light/50 ${collapsed ? 'justify-center' : ''}`}>
 						<div className='w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0 text-primary font-bold text-sm overflow-hidden'>
 							{user.avatar

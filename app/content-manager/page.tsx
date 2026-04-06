@@ -1,13 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
-import Card from '@/components/ui/Card'
-import { AdminCategory, api, BackendCase } from '@/lib/api'
-import { canAccessContentManager, useAuth } from '@/lib/auth-context'
-import { AnimatePresence, motion } from 'framer-motion'
+import Sidebar from '@/components/layout/Sidebar';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import { AdminCategory, api, BackendCase } from '@/lib/api';
+import { canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
     AlertCircle,
     CheckCircle,
@@ -24,9 +24,9 @@ import {
     Upload,
     UserCog,
     X,
-} from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const fadeIn = {
 	hidden: { opacity: 0, y: 20 },
@@ -42,11 +42,34 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'warning' 
 
 type MediaItem = { type: 'xray' | 'ekg' | 'echo' | 'image' | 'video'; fileData: string; comment: string; fileName?: string }
 type LabRow = { name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical' }
+type InstrumentalTest = 'ekg' | 'uzi' | 'rentgen' | 'kt' | 'mrt' | 'endoskopiya'
+type LaboratoryTest = 'qon_analiz' | 'siydik_analiz' | 'bioximik'
+
+const INSTRUMENTAL_OPTIONS: Array<{ key: InstrumentalTest; label: string }> = [
+	{ key: 'ekg', label: 'EKG' },
+	{ key: 'uzi', label: 'UZI (Ultratovush tekshiruvi)' },
+	{ key: 'rentgen', label: 'Rentgen' },
+	{ key: 'kt', label: 'KT' },
+	{ key: 'mrt', label: 'MRT' },
+	{ key: 'endoskopiya', label: 'Endoskopiya' },
+]
+
+const LABORATORY_OPTIONS: Array<{ key: LaboratoryTest; label: string }> = [
+	{ key: 'qon_analiz', label: 'Qon analiz' },
+	{ key: 'siydik_analiz', label: 'Siydik analiz' },
+	{ key: 'bioximik', label: 'Bioximik analiz' },
+]
+
+const LAB_TO_SECTION: Record<LaboratoryTest, 'bloodTest' | 'urineTest' | 'biochemTest'> = {
+	qon_analiz: 'bloodTest',
+	siydik_analiz: 'urineTest',
+	bioximik: 'biochemTest',
+}
 
 const LAB_SECTIONS = [
-	{ key: 'bloodTest' as const, label: 'Qon tahlili (umumiy)' },
-	{ key: 'biochemTest' as const, label: 'Bioximik tahlil' },
-	{ key: 'urineTest' as const, label: 'Siydik tahlili' },
+	{ key: 'bloodTest' as const, label: 'Qon analiz' },
+	{ key: 'biochemTest' as const, label: 'Bioximik analiz' },
+	{ key: 'urineTest' as const, label: 'Siydik analiz' },
 ]
 
 interface CaseFormData {
@@ -70,9 +93,8 @@ interface CaseFormData {
 	correctDiagnosis: string
 	correctTreatment: string
 	timeLimit: number
-	hasXray: boolean
-	hasEkg: boolean
-	hasEcho: boolean
+	instrumentalTests: InstrumentalTest[]
+	laboratoryTests: LaboratoryTest[]
 	mediaItems: MediaItem[]
 	labResults: LabRow[]
 	bloodTest: LabRow[]
@@ -86,13 +108,40 @@ const emptyForm = (): CaseFormData => ({
 	bp: '120/80', hr: '72', temp: '36.6', spo2: '98',
 	correctDiagnosis: '', correctTreatment: '',
 	timeLimit: 600,
-	hasXray: false, hasEkg: false, hasEcho: false, mediaItems: [], labResults: [], bloodTest: [], biochemTest: [], urineTest: [],
+	instrumentalTests: [], laboratoryTests: [], mediaItems: [], labResults: [], bloodTest: [], biochemTest: [], urineTest: [],
 })
 
 /* ─── Case Form Modal ─── */
 function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: BackendCase | null; onClose: () => void; onSave: () => void; adminCategories: AdminCategory[] }) {
 	const [form, setForm] = useState<CaseFormData>(() => {
 		if (!editCase) return emptyForm()
+
+		const mediaItems = (editCase.mediaItems ?? []).map(m => ({ type: m.type, fileData: m.fileData, comment: m.comment, fileName: m.fileName }))
+		const bloodTest = ((editCase as BackendCase & { bloodTest?: LabRow[] }).bloodTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status }))
+		const biochemTest = ((editCase as BackendCase & { biochemTest?: LabRow[] }).biochemTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status }))
+		const urineTest = ((editCase as BackendCase & { urineTest?: LabRow[] }).urineTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status }))
+
+		const fallbackInstrumental: InstrumentalTest[] = [
+			...(mediaItems.some(m => m.type === 'ekg') ? ['ekg' as const] : []),
+			...(mediaItems.some(m => m.type === 'echo') ? ['uzi' as const] : []),
+			...(mediaItems.some(m => m.type === 'xray') ? ['rentgen' as const] : []),
+			...(mediaItems.some(m => m.type === 'image' || m.type === 'video') ? ['endoskopiya' as const] : []),
+		]
+
+		const fallbackLaboratory: LaboratoryTest[] = [
+			...(bloodTest.length > 0 ? ['qon_analiz' as const] : []),
+			...(urineTest.length > 0 ? ['siydik_analiz' as const] : []),
+			...(biochemTest.length > 0 ? ['bioximik' as const] : []),
+		]
+
+		const incomingInstrumental = Array.isArray(editCase.instrumentalTests)
+			? editCase.instrumentalTests.filter((t): t is InstrumentalTest => INSTRUMENTAL_OPTIONS.some(o => o.key === t))
+			: fallbackInstrumental
+
+		const incomingLaboratory = Array.isArray(editCase.laboratoryTests)
+			? editCase.laboratoryTests.filter((t): t is LaboratoryTest => LABORATORY_OPTIONS.some(o => o.key === t))
+			: fallbackLaboratory
+
 		return {
 			title: editCase.title, category: editCase.category, difficulty: editCase.difficulty,
 			type: editCase.type, isPremium: editCase.isPremium, status: (editCase.status === 'rejected' ? 'draft' : editCase.status) as CaseFormData['status'],
@@ -105,14 +154,13 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 			correctDiagnosis: (editCase as BackendCase & { correctDiagnosis?: string }).correctDiagnosis ?? '',
 			correctTreatment: (editCase as BackendCase & { correctTreatment?: string }).correctTreatment ?? '',
 			timeLimit: (editCase as BackendCase & { timeLimit?: number }).timeLimit ?? 600,
-			hasXray: (editCase.mediaItems ?? []).some(m => m.type === 'xray'),
-			hasEkg: (editCase.mediaItems ?? []).some(m => m.type === 'ekg'),
-			hasEcho: (editCase.mediaItems ?? []).some(m => m.type === 'echo'),
-			mediaItems: (editCase.mediaItems ?? []).map(m => ({ type: m.type, fileData: m.fileData, comment: m.comment, fileName: m.fileName })),
+			instrumentalTests: incomingInstrumental,
+			laboratoryTests: incomingLaboratory,
+			mediaItems,
 			labResults: ((editCase as BackendCase & { labResults?: LabRow[] }).labResults ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status })),
-			bloodTest: ((editCase as BackendCase & { bloodTest?: LabRow[] }).bloodTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status })),
-			biochemTest: ((editCase as BackendCase & { biochemTest?: LabRow[] }).biochemTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status })),
-			urineTest: ((editCase as BackendCase & { urineTest?: LabRow[] }).urineTest ?? []).map(l => ({ name: l.name, value: l.value, unit: l.unit, range: l.range, status: l.status })),
+			bloodTest,
+			biochemTest,
+			urineTest,
 		}
 	})
 	const [saving, setSaving] = useState(false)
@@ -182,11 +230,31 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 			} else {
 				mediaItems = f.mediaItems.filter(m => m.type !== type)
 			}
-			const next: CaseFormData = { ...f, mediaItems }
-			if (type === 'xray' && mediaItems.filter(m => m.type === 'xray').length === 0) next.hasXray = false
-			if (type === 'ekg' && mediaItems.filter(m => m.type === 'ekg').length === 0) next.hasEkg = false
-			if (type === 'echo' && mediaItems.filter(m => m.type === 'echo').length === 0) next.hasEcho = false
-			return next
+			return { ...f, mediaItems }
+		})
+	}
+
+	function toggleInstrumentalTest(test: InstrumentalTest) {
+		setForm(f => {
+			const exists = f.instrumentalTests.includes(test)
+			return {
+				...f,
+				instrumentalTests: exists
+					? f.instrumentalTests.filter(t => t !== test)
+					: [...f.instrumentalTests, test],
+			}
+		})
+	}
+
+	function toggleLaboratoryTest(test: LaboratoryTest) {
+		setForm(f => {
+			const exists = f.laboratoryTests.includes(test)
+			return {
+				...f,
+				laboratoryTests: exists
+					? f.laboratoryTests.filter(t => t !== test)
+					: [...f.laboratoryTests, test],
+			}
 		})
 	}
 
@@ -211,15 +279,77 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 		setSaving(true)
 		setError('')
 		try {
+			if (form.instrumentalTests.length === 0) {
+				setError('Instrumental tekshiruvlar menyusidan kamida bitta variant tanlang')
+				setSaving(false)
+				return
+			}
+
+			if (form.laboratoryTests.length === 0) {
+				setError('Laborator tekshiruvlar menyusidan kamida bitta variant tanlang')
+				setSaving(false)
+				return
+			}
+
+			if (form.mediaItems.length === 0) {
+				setError('Har bir klinik holat uchun kamida bitta rasm yoki grafik media yuklash majburiy')
+				setSaving(false)
+				return
+			}
+
 			// Validate media comments for named sections
 			for (const m of form.mediaItems) {
 				if ((m.type === 'xray' || m.type === 'ekg' || m.type === 'echo') && !m.comment.trim()) {
-					const labels: Record<string, string> = { xray: 'KT/Rentgen', ekg: 'EKG', echo: 'EXO' }
+					const labels: Record<string, string> = { xray: 'Rentgen/KT/MRT', ekg: 'EKG', echo: 'UZI' }
 					setError(`${labels[m.type]} rasmi uchun izoh kiritilishi shart`)
 					setSaving(false)
 					return
 				}
 			}
+
+			const needsXray = form.instrumentalTests.some(t => t === 'rentgen' || t === 'kt' || t === 'mrt')
+			if (needsXray && xrayItems.length === 0) {
+				setError('Rentgen/KT/MRT tanlangan. Shu bo\'lim uchun kamida bitta rasm yuklang')
+				setSaving(false)
+				return
+			}
+
+			if (form.instrumentalTests.includes('ekg') && ekgItems.length === 0) {
+				setError('EKG tanlangan. EKG rasmi yoki grafigini yuklang')
+				setSaving(false)
+				return
+			}
+
+			if (form.instrumentalTests.includes('uzi') && echoItems.length === 0) {
+				setError('UZI tanlangan. UZI uchun rasm/grafik yuklang')
+				setSaving(false)
+				return
+			}
+
+			if (form.instrumentalTests.includes('endoskopiya') && !imageItem && !videoItem) {
+				setError('Endoskopiya tanlangan. Qo\'shimcha rasm yoki video yuklash shart')
+				setSaving(false)
+				return
+			}
+
+			if (form.laboratoryTests.includes('qon_analiz') && form.bloodTest.length === 0) {
+				setError('Qon analiz tanlangan. Kamida bitta qon analiz qatori kiriting')
+				setSaving(false)
+				return
+			}
+
+			if (form.laboratoryTests.includes('siydik_analiz') && form.urineTest.length === 0) {
+				setError('Siydik analiz tanlangan. Kamida bitta siydik analiz qatori kiriting')
+				setSaving(false)
+				return
+			}
+
+			if (form.laboratoryTests.includes('bioximik') && form.biochemTest.length === 0) {
+				setError('Bioximik analiz tanlangan. Kamida bitta bioximik qator kiriting')
+				setSaving(false)
+				return
+			}
+
 			const payload: Partial<BackendCase> = {
 				title: form.title, category: form.category, difficulty: form.difficulty,
 				type: form.type, isPremium: form.isPremium, status: form.status,
@@ -229,6 +359,8 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 					ageGroup: form.patientAgeGroup, complaints: form.complaints, history: form.history,
 					vitals: { bp: form.bp, hr: form.hr, temp: form.temp, spo2: form.spo2 },
 				},
+				instrumentalTests: form.instrumentalTests,
+				laboratoryTests: form.laboratoryTests,
 				mediaItems: form.mediaItems,
 				...({ correctDiagnosis: form.correctDiagnosis, correctTreatment: form.correctTreatment, labResults: form.labResults, bloodTest: form.bloodTest, biochemTest: form.biochemTest, urineTest: form.urineTest, timeLimit: form.timeLimit } as Partial<Record<string, unknown>>),
 			}
@@ -250,6 +382,13 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 	const echoItems = form.mediaItems.filter(m => m.type === 'echo')
 	const imageItem = form.mediaItems.find(m => m.type === 'image')
 	const videoItem = form.mediaItems.find(m => m.type === 'video')
+	const showXraySection = form.instrumentalTests.some(t => t === 'rentgen' || t === 'kt' || t === 'mrt')
+	const showEkgSection = form.instrumentalTests.includes('ekg')
+	const showUziSection = form.instrumentalTests.includes('uzi')
+	const endoscopyRequired = form.instrumentalTests.includes('endoskopiya')
+	const selectedLabSections = LAB_SECTIONS.filter(section =>
+		form.laboratoryTests.some(test => LAB_TO_SECTION[test] === section.key)
+	)
 
 	return (
 		<div className='fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto' onClick={onClose}>
@@ -396,29 +535,52 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 					<div className='border-t border-border pt-4'>
 						<p className='text-sm font-semibold text-text-primary mb-3'>Media fayllar</p>
 
-						{/* Toggles */}
-						<div className='flex flex-wrap gap-3 mb-4'>
-							{([
-								{ key: 'hasXray', label: 'KT / Rentgen kerak', type: 'xray' },
-								{ key: 'hasEkg', label: 'EKG kerak', type: 'ekg' },
-								{ key: 'hasEcho', label: 'EXO kerak', type: 'echo' },
-							] as const).map(({ key, label, type }) => (
-								<label key={key} className='flex items-center gap-2 cursor-pointer'>
-									<div className='relative'>
-										<input type='checkbox' className='sr-only' checked={form[key]} onChange={e => { set(key, e.target.checked); if (!e.target.checked) removeMedia(type) }} />
-										<div className={`w-9 h-5 rounded-full transition-colors ${form[key] ? 'bg-primary' : 'bg-surface-light border border-border'}`} />
-										<div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form[key] ? 'translate-x-4' : ''}`} />
-									</div>
-									<span className='text-sm text-text-primary'>{label}</span>
-								</label>
-							))}
+						{/* New required dropdown menus */}
+						<div className='grid grid-cols-1 md:grid-cols-2 gap-3 mb-4'>
+							<details className='bg-surface-light border border-border rounded-xl p-3'>
+								<summary className='cursor-pointer text-sm font-semibold text-text-primary'>
+									Instrumental tekshiruvlar ({form.instrumentalTests.length})
+								</summary>
+								<div className='mt-3 space-y-2'>
+									{INSTRUMENTAL_OPTIONS.map(opt => (
+										<label key={opt.key} className='flex items-center gap-2 text-sm text-text-primary cursor-pointer'>
+											<input
+												type='checkbox'
+												checked={form.instrumentalTests.includes(opt.key)}
+												onChange={() => toggleInstrumentalTest(opt.key)}
+												className='w-4 h-4 accent-primary'
+											/>
+											{opt.label}
+										</label>
+									))}
+								</div>
+							</details>
+
+							<details className='bg-surface-light border border-border rounded-xl p-3'>
+								<summary className='cursor-pointer text-sm font-semibold text-text-primary'>
+									Laborator tekshiruvlar ({form.laboratoryTests.length})
+								</summary>
+								<div className='mt-3 space-y-2'>
+									{LABORATORY_OPTIONS.map(opt => (
+										<label key={opt.key} className='flex items-center gap-2 text-sm text-text-primary cursor-pointer'>
+											<input
+												type='checkbox'
+												checked={form.laboratoryTests.includes(opt.key)}
+												onChange={() => toggleLaboratoryTest(opt.key)}
+												className='w-4 h-4 accent-primary'
+											/>
+											{opt.label}
+										</label>
+									))}
+								</div>
+							</details>
 						</div>
 
-{/* KT / Rentgen */}
-					{form.hasXray && (
+					{/* Rentgen / KT / MRT */}
+				{showXraySection && (
 						<div className='mb-3 p-4 bg-surface-light rounded-xl border border-border space-y-3'>
 							<div className='flex items-center justify-between'>
-								<p className='text-sm font-medium text-text-primary'>KT / Rentgen rasmlari</p>
+							<p className='text-sm font-medium text-text-primary'>Rentgen / KT / MRT rasmlari</p>
 								<button type='button' onClick={() => xrayRef.current?.click()} disabled={uploading === 'xray'}
 									className='flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50'>
 									{uploading === 'xray' ? <Loader2 className='w-3 h-3 animate-spin' /> : <Plus className='w-3 h-3' />} Rasm/GIF qo&apos;shish
@@ -448,7 +610,7 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 					)}
 
 					{/* EKG */}
-					{form.hasEkg && (
+					{showEkgSection && (
 						<div className='mb-3 p-4 bg-surface-light rounded-xl border border-border space-y-3'>
 							<div className='flex items-center justify-between'>
 								<p className='text-sm font-medium text-text-primary'>EKG rasmlari</p>
@@ -480,11 +642,11 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 						</div>
 					)}
 
-					{/* EXO */}
-					{form.hasEcho && (
+					{/* UZI */}
+					{showUziSection && (
 						<div className='mb-3 p-4 bg-surface-light rounded-xl border border-border space-y-3'>
 							<div className='flex items-center justify-between'>
-								<p className='text-sm font-medium text-text-primary'>EXO rasmlari</p>
+								<p className='text-sm font-medium text-text-primary'>UZI rasmlari</p>
 								<button type='button' onClick={() => echoRef.current?.click()} disabled={uploading === 'echo'}
 									className='flex items-center gap-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50'>
 									{uploading === 'echo' ? <Loader2 className='w-3 h-3 animate-spin' /> : <Plus className='w-3 h-3' />} Rasm/GIF qo&apos;shish
@@ -515,7 +677,9 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 
 					{/* Additional image */}
 					<div className='pt-2'>
-						<p className='text-xs font-semibold text-text-secondary mb-2'>Qo&apos;shimcha rasm / GIF (ixtiyoriy)</p>
+						<p className='text-xs font-semibold text-text-secondary mb-2'>
+							Qo&apos;shimcha rasm / GIF {endoscopyRequired ? '(Endoskopiya uchun majburiy)' : '(ixtiyoriy)'}
+						</p>
 						{imageItem ? (
 							<div className='p-3 bg-surface-light rounded-xl border border-border'>
 								<div className='flex items-center justify-between mb-2'>
@@ -538,7 +702,9 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 
 					{/* Video */}
 					<div>
-						<p className='text-xs font-semibold text-text-secondary mb-2'>Video (ixtiyoriy)</p>
+						<p className='text-xs font-semibold text-text-secondary mb-2'>
+							Video {endoscopyRequired ? '(Endoskopiya uchun mos)' : '(ixtiyoriy)'}
+						</p>
 						{videoItem ? (
 							<div className='p-3 bg-surface-light rounded-xl border border-border'>
 								<div className='flex items-center justify-between mb-2'>
@@ -563,7 +729,10 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 					{/* Lab Sections */}
 					<div className='border-t border-border pt-4 space-y-4'>
 						<p className='text-sm font-semibold text-text-primary'>Laboratoriya tahlillari</p>
-						{LAB_SECTIONS.map(({ key, label }) => (
+						{selectedLabSections.length === 0 && (
+							<p className='text-xs text-text-secondary/60'>Avval Laborator tekshiruvlar dropdown menyusidan bo&apos;lim tanlang.</p>
+						)}
+						{selectedLabSections.map(({ key, label }) => (
 							<div key={key} className='bg-surface-light rounded-xl border border-border p-3'>
 								<div className='flex items-center justify-between mb-2'>
 									<p className='text-xs font-semibold text-text-primary'>{label}</p>
@@ -844,6 +1013,7 @@ export default function ContentManagerPage() {
 												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Kategoriya</th>
 												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Holat</th>
 												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Qiyinlik</th>
+												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Muallif</th>
 												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Media</th>
 												<th className='text-left py-3 px-2 text-text-secondary font-medium'>Amallar</th>
 											</tr>
@@ -872,11 +1042,14 @@ export default function ContentManagerPage() {
 																))}
 															</div>
 														</td>
+														<td className='py-3 px-2 text-xs text-text-secondary'>
+															{c.authorName || '—'}
+														</td>
 														<td className='py-3 px-2'>
 															<div className='flex gap-1'>
 																{(c.mediaItems ?? []).map(m => (
 																	<span key={m.type} className='text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded'>
-																		{m.type === 'xray' ? 'RTG' : m.type === 'ekg' ? 'EKG' : m.type === 'video' ? 'Video' : 'Rasm'}
+																		{m.type === 'xray' ? 'RTG/KT' : m.type === 'ekg' ? 'EKG' : m.type === 'echo' ? 'UZI' : m.type === 'video' ? 'Video' : 'Rasm'}
 																	</span>
 																))}
 																{(c.mediaItems ?? []).length === 0 && <span className='text-xs text-text-secondary/40'>—</span>}

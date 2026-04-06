@@ -6,8 +6,8 @@ import {
     useCallback,
     useContext,
     useSyncExternalStore,
-} from 'react'
-import { api, BackendUser } from './api'
+} from 'react';
+import { api, BackendUser } from './api';
 
 export type UserRole = 'user' | 'content-manager' | 'admin'
 
@@ -63,6 +63,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 const STORAGE_KEY = 'med-ai-auth'
+const AUTH_CHANGE_EVENT = 'med-ai-auth-changed'
 
 // Map backend roles to frontend roles
 function mapRole(backendRole: string): UserRole {
@@ -99,10 +100,30 @@ let listeners: Array<() => void> = []
 
 function emitChange() {
   for (const listener of listeners) listener()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
+  }
 }
 
 function subscribe(listener: () => void) {
   listeners = [...listeners, listener]
+
+  if (typeof window !== 'undefined') {
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === STORAGE_KEY) listener()
+    }
+    const onAuthChanged = () => listener()
+
+    window.addEventListener('storage', onStorage)
+    window.addEventListener(AUTH_CHANGE_EVENT, onAuthChanged)
+
+    return () => {
+      listeners = listeners.filter(l => l !== listener)
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(AUTH_CHANGE_EVENT, onAuthChanged)
+    }
+  }
+
   return () => {
     listeners = listeners.filter(l => l !== listener)
   }

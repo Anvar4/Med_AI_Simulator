@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express'
+import { NextFunction, Request, Response } from 'express';
 
 export const errorHandler = (
   err: Error,
@@ -6,6 +6,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
+  void _next
   console.error('Error:', err.message)
 
   if (err.name === 'ValidationError') {
@@ -18,7 +19,8 @@ export const errorHandler = (
     return
   }
 
-  if ((err as any).code === 11000) {
+  const errWithCode = err as Error & { code?: number }
+  if (errWithCode.code === 11000) {
     res.status(400).json({ message: 'Bu ma\'lumot allaqachon mavjud' })
     return
   }

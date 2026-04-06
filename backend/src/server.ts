@@ -1,37 +1,55 @@
-import cors from 'cors'
-import dotenv from 'dotenv'
-import express from 'express'
-import rateLimit from 'express-rate-limit'
-import helmet from 'helmet'
-import mongoose from 'mongoose'
-import path from 'path'
+import cors from 'cors';
+import dotenv from 'dotenv';
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import mongoose from 'mongoose';
+import path from 'path';
 
-import { errorHandler } from './middleware/errorHandler'
-import adminRoutes from './routes/admin'
-import attemptRoutes from './routes/attempts'
-import authRoutes from './routes/auth'
-import caseRoutes from './routes/cases'
-import chatRoutes from './routes/chat'
-import statsRoutes from './routes/stats'
-import subscriptionRoutes from './routes/subscriptions'
-import ttsRoutes from './routes/tts'
-import uploadRoutes from './routes/upload'
+import { errorHandler } from './middleware/errorHandler';
+import adminRoutes from './routes/admin';
+import attemptRoutes from './routes/attempts';
+import authRoutes from './routes/auth';
+import caseRoutes from './routes/cases';
+import chatRoutes from './routes/chat';
+import statsRoutes from './routes/stats';
+import subscriptionRoutes from './routes/subscriptions';
+import ttsRoutes from './routes/tts';
+import uploadRoutes from './routes/upload';
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
+const FALLBACK_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://med-ai-simulator.vercel.app',
+]
+
+const allowedOrigins = (process.env.CLIENT_ORIGINS || FALLBACK_ORIGINS.join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean)
+
+app.set('trust proxy', 1)
 
 // Security middleware
-app.use(helmet())
+app.use(
+  helmet({
+    // Frontend (3000) loads image assets from backend (5000) via /uploads.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+)
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://med-ai-simulator.vercel.app',
-      /\.vercel\.app$/,
-    ],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+        return callback(null, true)
+      }
+      return callback(new Error('CORS: origin ruxsat etilmagan'))
+    },
     credentials: true,
   })
 )
@@ -82,7 +100,12 @@ app.use(errorHandler)
 // Database connection & server start
 async function start() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI!)
+    const mongoUri = process.env.MONGODB_URI
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI topilmadi. .env faylga MONGODB_URI kiriting.')
+    }
+
+    await mongoose.connect(mongoUri)
     console.log('MongoDB ga muvaffaqiyatli ulandi')
 
     app.listen(PORT, () => {

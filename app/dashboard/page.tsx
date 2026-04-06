@@ -26,6 +26,76 @@ const stagger = {
 	visible: { transition: { staggerChildren: 0.1 } },
 }
 
+const DAY_LABELS = ['Ya', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh']
+
+function makeDemoCase(
+	id: string,
+	title: string,
+	category: string,
+	type: BackendCase['type'],
+	difficulty: number,
+	isPremium = false,
+	authorName = 'Dr. Demo'
+): BackendCase {
+	const now = new Date().toISOString()
+	return {
+		_id: id,
+		caseId: id,
+		title,
+		authorName,
+		category,
+		difficulty,
+		type,
+		isPremium,
+		description: 'Demo klinik holat',
+		status: 'published',
+		patient: {
+			name: 'Demo Bemor',
+			age: 45,
+			gender: 'Erkak',
+			ageGroup: 'Katta yoshli',
+			vitals: { bp: '130/85', hr: '88', temp: '36.7', spo2: '97' },
+			complaints: 'Demo shikoyatlari',
+			history: 'Demo anamnez',
+		},
+		correctDiagnosis: 'Demo tashxis',
+		correctTreatment: 'Demo davolash rejasi',
+		tests: ['EKG', 'QON ANALIZ'],
+		timeLimit: type === 'shoshilinch' ? 300 : 600,
+		createdAt: now,
+		updatedAt: now,
+	}
+}
+
+const DEMO_DASHBOARD_CASES: BackendCase[] = [
+	makeDemoCase('demo-case-1', 'Ko‘krak og‘rig‘i va nafas qisilishi', 'Kardiologiya', 'diagnostika', 3, false, 'Dr. Sardor Karimov'),
+	makeDemoCase('demo-case-2', 'Qorin og‘rig‘i va isitma', 'Jarrohlik', 'shoshilinch', 4, true, 'Dr. Nilufar Toirova'),
+	makeDemoCase('demo-case-3', 'Keskin bosh og‘rig‘i', 'Nevrologiya', 'diagnostika', 2, false, 'Dr. Dildora Islomova'),
+]
+
+const DEMO_DASHBOARD_STATS: DashboardStats = {
+	totalCases: 34,
+	avgScore: 78.6,
+	weeklyCount: 11,
+	streak: 6,
+	categoryScores: [
+		{ _id: 'Kardiologiya', avgScore: 82.4, count: 10 },
+		{ _id: 'Nevrologiya', avgScore: 75.2, count: 8 },
+		{ _id: 'Jarrohlik', avgScore: 69.8, count: 7 },
+		{ _id: 'Pediatriya', avgScore: 80.1, count: 9 },
+	],
+	weeklyActivity: [
+		{ _id: 0, count: 1 },
+		{ _id: 1, count: 2 },
+		{ _id: 2, count: 1 },
+		{ _id: 3, count: 3 },
+		{ _id: 4, count: 2 },
+		{ _id: 5, count: 1 },
+		{ _id: 6, count: 1 },
+	],
+	recentAttempts: [],
+}
+
 export default function DashboardPage() {
 	const { user } = useAuth()
 	const router = useRouter()
@@ -57,7 +127,7 @@ export default function DashboardPage() {
 			}
 		}
 		load()
-	}, [])
+	}, [user])
 
 	if (loading) {
 		return (
@@ -70,9 +140,20 @@ export default function DashboardPage() {
 		)
 	}
 
-	const weeklyActivity = (stats?.weeklyActivity ?? []).map(w => ({ day: ['Ya', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'][w._id] ?? `${w._id}`, count: w.count }))
-	const continueAttempt = stats?.continueCase
-	const continueCaseData = continueAttempt?.case as BackendCase | undefined
+	const hasRealStats = !!stats && (
+		stats.totalCases > 0 ||
+		stats.weeklyCount > 0 ||
+		stats.categoryScores.length > 0 ||
+		stats.weeklyActivity.length > 0
+	)
+
+	const safeStats = hasRealStats ? stats! : DEMO_DASHBOARD_STATS
+	const safeCases = cases.length > 0 ? cases : DEMO_DASHBOARD_CASES
+	const isDemoMode = !hasRealStats || cases.length === 0
+
+	const weeklyActivity = (safeStats.weeklyActivity ?? []).map(w => ({ day: DAY_LABELS[w._id] ?? `${w._id}`, count: w.count }))
+	const continueAttempt = safeStats.continueCase
+	const continueCaseData = (continueAttempt?.case as BackendCase | undefined) ?? safeCases[0]
 
 	return (
 		<div className='min-h-screen bg-secondary'>
@@ -93,6 +174,9 @@ export default function DashboardPage() {
 						<p className='text-text-secondary'>
 							Bugungi mashg&apos;ulotingizni davom eting
 						</p>
+						{isDemoMode && (
+							<p className='text-xs text-primary mt-2'>Demo ma&apos;lumotlar ko&apos;rsatilmoqda</p>
+						)}
 					</motion.div>
 
 					{/* Stats Grid */}
@@ -105,28 +189,28 @@ export default function DashboardPage() {
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<BookOpen className='w-5 h-5' />}
-								value={stats?.totalCases ?? 0}
+								value={safeStats.totalCases}
 								label='Jami yechilgan klinik holatlar'
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Target className='w-5 h-5' />}
-								value={stats?.avgScore ?? 0}
+								value={Math.round(safeStats.avgScore)}
 								label="O'rtacha ball"
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Calendar className='w-5 h-5' />}
-								value={stats?.weeklyCount ?? 0}
+								value={safeStats.weeklyCount}
 								label='Bu hafta'
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Flame className='w-5 h-5' />}
-								value={`${stats?.streak ?? 0} kun 🔥`}
+								value={`${safeStats.streak} kun 🔥`}
 								label='Streak'
 							/>
 						</motion.div>
@@ -155,7 +239,7 @@ export default function DashboardPage() {
 									Karyera Progress
 								</h3>
 								<div className='space-y-5'>
-									{(stats?.categoryScores ?? []).map(
+									{(safeStats.categoryScores ?? []).map(
 										(cat) => (
 											<div key={cat._id}>
 												<div className='flex justify-between items-center mb-2'>
@@ -200,7 +284,7 @@ export default function DashboardPage() {
 									<div className='flex items-center gap-2 mb-2'>
 										<Badge>{continueCaseData.category}</Badge>
 										<span className='text-xs text-text-secondary'>
-											Davom etilmoqda
+											{continueAttempt ? 'Davom etilmoqda' : 'Demo tavsiya'}
 										</span>
 									</div>
 									<h3 className='text-base font-semibold text-text-primary mb-3'>
@@ -230,11 +314,12 @@ export default function DashboardPage() {
 							</Link>
 						</div>
 						<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
-							{cases.map(c => (
+							{safeCases.map(c => (
 								<motion.div key={c._id} variants={fadeIn}>
 									<CaseCard
 										id={c._id}
 										title={c.title}
+										authorName={c.authorName}
 										category={c.category}
 										difficulty={c.difficulty}
 										type={c.type}

@@ -1,15 +1,79 @@
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import Card from '@/components/ui/Card'
-import { api, UserStats } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
-import { motion } from 'framer-motion'
-import { Activity, Award, BarChart3, BookOpen, Brain, Stethoscope, Target, TrendingUp } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import Sidebar from '@/components/layout/Sidebar';
+import Card from '@/components/ui/Card';
+import { api, Attempt, UserStats } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { motion } from 'framer-motion';
+import { Activity, Award, BarChart3, BookOpen, Brain, Stethoscope, Target, TrendingUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }
+
+function makeDemoAttempt(id: string, score: number, daysAgo: number, label: string): Attempt {
+	const completedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+	return {
+		_id: id,
+		user: 'demo-user',
+		case: label,
+		status: 'completed',
+		score,
+		diagnosis: 'Demo tashxis',
+		treatment: 'Demo davolash',
+		selectedTests: ['EKG', 'QON ANALIZ'],
+		timeSpent: 320,
+		aiFeedback: 'Demo feedback',
+		completedAt,
+		createdAt: completedAt,
+	}
+}
+
+const DEMO_RECENT_RESULTS: Attempt[] = [
+	makeDemoAttempt('demo-a1', 92, 1, 'Ko\'krak og\'rig\'i'),
+	makeDemoAttempt('demo-a2', 84, 3, 'Insult alomatlari'),
+	makeDemoAttempt('demo-a3', 76, 5, 'Astma xuruji'),
+	makeDemoAttempt('demo-a4', 68, 8, 'Appenditsit shubhasi'),
+	makeDemoAttempt('demo-a5', 81, 12, 'Sepsis xavfi'),
+	makeDemoAttempt('demo-a6', 73, 16, 'Qorin travmasi'),
+	makeDemoAttempt('demo-a7', 88, 20, 'Preeeklampsiya'),
+	makeDemoAttempt('demo-a8', 79, 24, 'DKA holati'),
+]
+
+const DEMO_USER_STATS: UserStats = {
+	totalAttempts: 36,
+	completedAttempts: 34,
+	avgScore: 79,
+	totalTimeSpent: 12450,
+	categoryPerformance: [
+		{ category: 'Kardiologiya', avgScore: 84, count: 9, maxScore: 96, minScore: 68 },
+		{ category: 'Nevrologiya', avgScore: 77, count: 7, maxScore: 91, minScore: 62 },
+		{ category: 'Jarrohlik', avgScore: 71, count: 6, maxScore: 86, minScore: 55 },
+		{ category: 'Pediatriya', avgScore: 81, count: 6, maxScore: 93, minScore: 67 },
+		{ category: 'Ginekologiya', avgScore: 78, count: 6, maxScore: 90, minScore: 64 },
+	],
+	difficultyPerformance: [
+		{ difficulty: 2, avgScore: 85, count: 10 },
+		{ difficulty: 3, avgScore: 79, count: 14 },
+		{ difficulty: 4, avgScore: 72, count: 8 },
+		{ difficulty: 5, avgScore: 67, count: 4 },
+	],
+	typePerformance: [
+		{ type: 'diagnostika', avgScore: 82, count: 18 },
+		{ type: 'jarrohlik', avgScore: 73, count: 8 },
+		{ type: 'shoshilinch', avgScore: 76, count: 8 },
+	],
+	monthlyActivity: [
+		{ month: '2025-11', count: 4, avgScore: 71 },
+		{ month: '2025-12', count: 6, avgScore: 75 },
+		{ month: '2026-01', count: 7, avgScore: 78 },
+		{ month: '2026-02', count: 5, avgScore: 80 },
+		{ month: '2026-03', count: 8, avgScore: 82 },
+		{ month: '2026-04', count: 6, avgScore: 79 },
+	],
+	recentResults: DEMO_RECENT_RESULTS,
+	bestResult: DEMO_RECENT_RESULTS[0],
+}
 
 function SummaryCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: React.ElementType; sub?: string }) {
 	return (
@@ -62,19 +126,9 @@ export default function StatisticsPage() {
 		</div>
 	)
 
-	if (error) return (
-		<div className='min-h-screen bg-secondary'>
-			<Sidebar />
-			<main className='lg:pl-64 pt-16 lg:pt-0 pb-6 flex items-center justify-center min-h-screen'>
-				<div className='text-center'>
-					<p className='text-accent'>{error}</p>
-					<button onClick={() => window.location.reload()} className='mt-3 text-primary hover:underline text-sm'>Qayta urinish</button>
-				</div>
-			</main>
-		</div>
-	)
-
-	const maxMonthCount = stats ? Math.max(...stats.monthlyActivity.map(m => m.count), 1) : 1
+	const effectiveStats = stats && stats.totalAttempts > 0 ? stats : DEMO_USER_STATS
+	const isDemoMode = !stats || stats.totalAttempts === 0 || !!error
+	const maxMonthCount = Math.max(...effectiveStats.monthlyActivity.map(m => m.count), 1)
 
 	return (
 		<div className='min-h-screen bg-secondary'>
@@ -84,29 +138,16 @@ export default function StatisticsPage() {
 					<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-1'>Statistika</h1>
 						<p className='text-text-secondary text-sm'>Sizning taraqqiyotingiz va natijalaringiz</p>
+						{isDemoMode && <p className='text-xs text-primary mt-2'>Demo statistika ko&apos;rsatilmoqda</p>}
 					</motion.div>
 
-					{!stats || stats.totalAttempts === 0 ? (
-						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
-							<Card hover={false}>
-								<div className='text-center py-10 space-y-3'>
-									<BarChart3 className='w-12 h-12 text-text-secondary/30 mx-auto' />
-									<p className='text-text-primary font-semibold'>Hozircha ma&apos;lumot yo&apos;q</p>
-									<p className='text-text-secondary text-sm'>Klinik holatlarni yeching va statistikangiz shu yerda ko&apos;rinadi</p>
-									<button onClick={() => router.push('/cases')} className='bg-primary text-secondary font-semibold px-5 py-2 rounded-xl text-sm mt-2'>
-										Keyslarni boshlash
-									</button>
-								</div>
-							</Card>
-						</motion.div>
-					) : (
 						<>
 							{/* Summary Cards */}
 							<motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
-								<SummaryCard label='Jami urinishlar' value={stats.totalAttempts} icon={BookOpen} />
-							<SummaryCard label="O'rtacha ball" value={`${stats.avgScore}%`} icon={Target} sub={stats.avgScore >= 70 ? 'Yaxshi' : stats.avgScore >= 50 ? "O'rtacha" : 'Yaxshilash kerak'} />
-							<SummaryCard label='Eng yaxshi natija' value={`${stats.bestResult?.score ?? 0}%`} icon={Award} />
-								<SummaryCard label='Kategoriyalar' value={stats.categoryPerformance.length} icon={Brain} />
+								<SummaryCard label='Jami urinishlar' value={effectiveStats.totalAttempts} icon={BookOpen} />
+							<SummaryCard label="O'rtacha ball" value={`${effectiveStats.avgScore}%`} icon={Target} sub={effectiveStats.avgScore >= 70 ? 'Yaxshi' : effectiveStats.avgScore >= 50 ? "O'rtacha" : 'Yaxshilash kerak'} />
+							<SummaryCard label='Eng yaxshi natija' value={`${effectiveStats.bestResult?.score ?? 0}%`} icon={Award} />
+								<SummaryCard label='Kategoriyalar' value={effectiveStats.categoryPerformance.length} icon={Brain} />
 							</motion.div>
 
 							{/* Monthly Activity */}
@@ -117,7 +158,7 @@ export default function StatisticsPage() {
 										<h3 className='font-semibold text-text-primary'>Oylik faollik (oxirgi 6 oy)</h3>
 									</div>
 									<div className='flex items-end gap-2 h-40'>
-										{stats.monthlyActivity.map(m => {
+										{effectiveStats.monthlyActivity.map(m => {
 											const pct = maxMonthCount === 0 ? 0 : (m.count / maxMonthCount) * 100
 											return (
 												<div key={m.month} className='flex-1 flex flex-col items-center gap-1'>
@@ -134,7 +175,7 @@ export default function StatisticsPage() {
 							</motion.div>
 
 							{/* Category Performance */}
-							{stats.categoryPerformance.length > 0 && (
+							{effectiveStats.categoryPerformance.length > 0 && (
 								<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 									<Card hover={false}>
 										<div className='flex items-center gap-3 mb-5'>
@@ -142,7 +183,7 @@ export default function StatisticsPage() {
 											<h3 className='font-semibold text-text-primary'>Kategoriyalar bo&apos;yicha natijalar</h3>
 										</div>
 										<div className='space-y-4'>
-											{stats.categoryPerformance.map(cat => (
+											{effectiveStats.categoryPerformance.map(cat => (
 												<div key={cat.category}>
 													<div className='flex items-center justify-between mb-1'>
 														<p className='text-sm text-text-primary capitalize'>{cat.category}</p>
@@ -167,7 +208,7 @@ export default function StatisticsPage() {
 										<h3 className='font-semibold text-text-primary'>Qiyinlik darajalari</h3>
 									</div>
 									<div className='space-y-3'>
-										{stats.difficultyPerformance.length === 0 ? <p className='text-sm text-text-secondary'>Ma&apos;lumot yo&apos;q</p> : stats.difficultyPerformance.map(d => (
+										{effectiveStats.difficultyPerformance.length === 0 ? <p className='text-sm text-text-secondary'>Ma&apos;lumot yo&apos;q</p> : effectiveStats.difficultyPerformance.map(d => (
 											<div key={d.difficulty}>
 												<div className='flex justify-between text-sm mb-1'>
 										<span className='text-text-primary capitalize'>{d.difficulty <= 2 ? 'Oson' : d.difficulty <= 3 ? "O'rta" : 'Qiyin'}</span>
@@ -187,7 +228,7 @@ export default function StatisticsPage() {
 									<div className='space-y-3'>
 										{(() => {
 											const dist = { '90-100': 0, '70-89': 0, '50-69': 0, '0-49': 0 }
-											for (const r of stats.recentResults) {
+											for (const r of effectiveStats.recentResults) {
 												if (r.score >= 90) dist['90-100']++
 												else if (r.score >= 70) dist['70-89']++
 												else if (r.score >= 50) dist['50-69']++
@@ -204,7 +245,7 @@ export default function StatisticsPage() {
 														<span className='text-text-primary'>{label}</span>
 														<span className='text-text-secondary'>{dist[key]}</span>
 													</div>
-													<ScoreBar value={dist[key]} max={Math.max(stats.totalAttempts, 1)} color={color} />
+														<ScoreBar value={dist[key]} max={Math.max(effectiveStats.totalAttempts, 1)} color={color} />
 												</div>
 											))
 										})()}
@@ -213,7 +254,7 @@ export default function StatisticsPage() {
 							</motion.div>
 
 							{/* Recent Results */}
-							{stats.recentResults.length > 0 && (
+							{effectiveStats.recentResults.length > 0 && (
 								<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 									<Card hover={false}>
 										<div className='flex items-center gap-3 mb-4'>
@@ -221,7 +262,7 @@ export default function StatisticsPage() {
 											<h3 className='font-semibold text-text-primary'>So&apos;nggi natijalar</h3>
 										</div>
 										<div className='space-y-2'>
-											{stats.recentResults.map((r, i) => (
+											{effectiveStats.recentResults.map((r, i) => (
 												<div key={i} className='flex items-center justify-between p-3 bg-surface-light rounded-xl'>
 													<div className='min-w-0 flex-1'>
 														<p className='text-sm font-medium text-text-primary truncate'>{typeof r.case === 'object' ? r.case.title : 'Klinik holat'}</p>
@@ -237,7 +278,6 @@ export default function StatisticsPage() {
 								</motion.div>
 							)}
 						</>
-					)}
 				</div>
 			</main>
 		</div>

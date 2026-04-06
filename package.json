@@ -4,8 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:frontend": "next dev",
+    "dev:backend": "npm --prefix backend run dev",
     "build": "next build",
+    "build:frontend": "next build",
+    "build:backend": "npm --prefix backend run build",
+    "build:all": "npm run build:frontend && npm run build:backend",
     "start": "next start",
+    "start:frontend": "next start",
+    "start:standalone": "node .next/standalone/server.js",
+    "start:backend": "npm --prefix backend run start",
+    "seed": "npm --prefix backend run seed",
+    "wipe:cases": "npm --prefix backend run wipe:cases -- --yes",
     "lint": "eslint"
   },
   "dependencies": {

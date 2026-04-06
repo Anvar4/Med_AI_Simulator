@@ -1,13 +1,14 @@
 'use client'
 
-import Badge from '@/components/ui/Badge'
-import { motion } from 'framer-motion'
-import { Lock, Star } from 'lucide-react'
-import Link from 'next/link'
+import Badge from '@/components/ui/Badge';
+import { motion } from 'framer-motion';
+import { Lock, Star } from 'lucide-react';
+import Link from 'next/link';
 
 interface CaseCardProps {
 	id: string
 	title: string
+	authorName?: string
 	category: string
 	difficulty: number
 	type: 'diagnostika' | 'jarrohlik' | 'shoshilinch'
@@ -30,6 +31,7 @@ const typeVariants = {
 export default function CaseCard({
 	id,
 	title,
+	authorName,
 	category,
 	difficulty,
 	type,
@@ -58,6 +60,12 @@ export default function CaseCard({
 					<h3 className='text-base font-semibold text-text-primary mb-3 leading-snug'>
 						{title}
 					</h3>
+
+					{authorName && (
+						<p className='text-xs text-text-secondary mb-3'>
+							Muallif: <span className='text-text-primary font-medium'>{authorName}</span>
+						</p>
+					)}
 
 					<div className='flex items-center justify-between'>
 						<div className='flex items-center gap-0.5'>

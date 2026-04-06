@@ -59,6 +59,19 @@ body {
 	transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+html,
+body {
+	max-width: 100%;
+	overflow-x: hidden;
+}
+
+img,
+video,
+canvas,
+iframe {
+	max-width: 100%;
+}
+
 h1,
 h2,
 h3,
@@ -78,6 +91,11 @@ h6 {
 	100% {
 		background-position: 0% 50%;
 	}
+}
+
+@keyframes shimmer {
+	0% { background-position: -200% center; }
+	100% { background-position: 200% center; }
 }
 
 .animate-gradient-mesh {

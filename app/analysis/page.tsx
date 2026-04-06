@@ -1,17 +1,64 @@
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import Card from '@/components/ui/Card'
-import { api, UserAnalysis } from '@/lib/api'
-import { canAccessContentManager, useAuth } from '@/lib/auth-context'
-import { motion } from 'framer-motion'
-import { AlertTriangle, BookOpen, Brain, CheckCircle, Lightbulb, Send, TrendingUp, Zap } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import Sidebar from '@/components/layout/Sidebar';
+import Card from '@/components/ui/Card';
+import { api, UserAnalysis } from '@/lib/api';
+import { canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { motion } from 'framer-motion';
+import { AlertTriangle, BookOpen, Brain, CheckCircle, Lightbulb, Send, TrendingUp, Zap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }
+
+const DEMO_ANALYSIS: UserAnalysis = {
+	overallAvg: 78,
+	totalCompleted: 34,
+	strengths: [
+		{ category: 'kardiologiya', avgScore: 85, count: 9 },
+		{ category: 'pediatriya', avgScore: 82, count: 7 },
+		{ category: 'ginekologiya', avgScore: 80, count: 6 },
+	],
+	weaknesses: [
+		{ category: 'travmatologiya', avgScore: 61, count: 5 },
+		{ category: 'jarrohlik', avgScore: 66, count: 8 },
+		{ category: 'endokrinologiya', avgScore: 64, count: 4 },
+	],
+	improving: [
+		{ category: 'nevrologiya', avgScore: 72, recentScore: 81 },
+		{ category: 'pulmonologiya', avgScore: 69, recentScore: 76 },
+		{ category: 'nefrologiya', avgScore: 67, recentScore: 73 },
+	],
+	recommendations: [
+		{
+			category: 'jarrohlik',
+			avgScore: 66,
+			suggestions: ['Differensial tashxis matritsasini ishlating', 'ABCDE bo\'yicha tekshiruv ketma-ketligini yozib boring'],
+		},
+		{
+			category: 'travmatologiya',
+			avgScore: 61,
+			suggestions: ['FAST/UZI indikatsiyalarini qayta ko\'rib chiqing', 'Qon ketish protokolini tez-tez takrorlang'],
+		},
+		{
+			category: 'endokrinologiya',
+			avgScore: 64,
+			suggestions: ['DKA va HHS farqlarini jadvalda yodlang', 'Insulin va suyuqlik rejasini bosqichma-bosqich tuzing'],
+		},
+	],
+	positiveAspects: [
+		'Bemor bilan muloqot uslubi aniq va ketma-ket',
+		'Asosiy hayotiy ko\'rsatkichlarni tez ajrata olasiz',
+		'Tezkor qaror kerak bo\'lgan holatlarda vaqtni yaxshi boshqarasiz',
+	],
+	negativeAspects: [
+		'Ba\'zi murakkab holatlarda tekshiruvlar keragidan ortiqcha buyuriladi',
+		'Davolash rejasida ustuvorlik tartibi doim ham aniq emas',
+		'Tuzilgan tashxisni differensial ro\'yxat bilan mustahkamlash kerak',
+	],
+}
 
 export default function AnalysisPage() {
 	const { user } = useAuth()
@@ -76,17 +123,19 @@ export default function AnalysisPage() {
 		</div>
 	)
 
-	if (error) return (
-		<div className='min-h-screen bg-secondary'>
-			<Sidebar />
-			<main className='lg:pl-64 pt-16 lg:pt-0 pb-6 flex items-center justify-center min-h-screen'>
-				<div className='text-center'>
-					<p className='text-accent'>{error}</p>
-					<button onClick={() => window.location.reload()} className='mt-3 text-primary hover:underline text-sm'>Qayta urinish</button>
-				</div>
-			</main>
-		</div>
+	const hasRealAnalysis = !!analysis && (
+		analysis.totalCompleted > 0 ||
+		analysis.overallAvg > 0 ||
+		analysis.strengths.length > 0 ||
+		analysis.weaknesses.length > 0 ||
+		analysis.improving.length > 0 ||
+		analysis.recommendations.length > 0 ||
+		analysis.positiveAspects.length > 0 ||
+		analysis.negativeAspects.length > 0
 	)
+
+	const effectiveAnalysis = hasRealAnalysis ? analysis! : DEMO_ANALYSIS
+	const isDemoMode = !hasRealAnalysis || !!error
 
 	return (
 		<div className='min-h-screen bg-secondary'>
@@ -96,118 +145,124 @@ export default function AnalysisPage() {
 					<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-1'>Profil tahlili</h1>
 						<p className='text-text-secondary text-sm'>Kuchli va zaif tomonlaringiz, tavsiyalar</p>
+						{isDemoMode && <p className='text-xs text-primary mt-2'>Demo tahlil ko&apos;rsatilmoqda</p>}
+						{error && <p className='text-xs text-accent mt-1'>{error}</p>}
 					</motion.div>
 
-					{!analysis ? (
+					<motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
+						<Card hover={false} className='p-4'>
+							<p className='text-xs text-text-secondary mb-1'>Yakunlangan urinish</p>
+							<p className='text-lg font-bold text-text-primary'>{effectiveAnalysis.totalCompleted}</p>
+						</Card>
+						<Card hover={false} className='p-4'>
+							<p className='text-xs text-text-secondary mb-1'>Umumiy o&apos;rtacha</p>
+							<p className='text-lg font-bold text-primary'>{effectiveAnalysis.overallAvg}%</p>
+						</Card>
+						<Card hover={false} className='p-4'>
+							<p className='text-xs text-text-secondary mb-1'>Kuchli yo&apos;nalishlar</p>
+							<p className='text-lg font-bold text-text-primary'>{effectiveAnalysis.strengths.length}</p>
+						</Card>
+						<Card hover={false} className='p-4'>
+							<p className='text-xs text-text-secondary mb-1'>Yaxshilash yo&apos;nalishlari</p>
+							<p className='text-lg font-bold text-accent'>{effectiveAnalysis.weaknesses.length}</p>
+						</Card>
+					</motion.div>
+
+					{/* Positive & Negative Aspects */}
+					<motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+						<Card hover={false}>
+							<div className='flex items-center gap-3 mb-4'>
+								<div className='p-2.5 bg-primary/10 rounded-xl'><CheckCircle className='w-5 h-5 text-primary' /></div>
+								<h3 className='font-semibold text-text-primary'>Ijobiy tomonlar</h3>
+							</div>
+							{effectiveAnalysis.positiveAspects.length === 0 ? (
+								<p className='text-sm text-text-secondary'>Hali baholash uchun yetarli ma&apos;lumot yo&apos;q</p>
+							) : (
+								<ul className='space-y-2'>
+									{effectiveAnalysis.positiveAspects.map((a, i) => (
+										<li key={i} className='flex items-start gap-2'>
+											<CheckCircle className='w-4 h-4 text-primary shrink-0 mt-0.5' />
+											<span className='text-sm text-text-primary'>{a}</span>
+										</li>
+									))}
+								</ul>
+							)}
+						</Card>
+
+						<Card hover={false}>
+							<div className='flex items-center gap-3 mb-4'>
+								<div className='p-2.5 bg-accent/10 rounded-xl'><AlertTriangle className='w-5 h-5 text-accent' /></div>
+								<h3 className='font-semibold text-text-primary'>Salbiy tomonlar</h3>
+							</div>
+							{effectiveAnalysis.negativeAspects.length === 0 ? (
+								<p className='text-sm text-text-secondary'>Hali baholash uchun yetarli ma&apos;lumot yo&apos;q</p>
+							) : (
+								<ul className='space-y-2'>
+									{effectiveAnalysis.negativeAspects.map((a, i) => (
+										<li key={i} className='flex items-start gap-2'>
+											<AlertTriangle className='w-4 h-4 text-accent shrink-0 mt-0.5' />
+											<span className='text-sm text-text-primary'>{a}</span>
+										</li>
+									))}
+								</ul>
+							)}
+						</Card>
+					</motion.div>
+
+					{/* Strengths */}
+					{effectiveAnalysis.strengths.length > 0 && (
 						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 							<Card hover={false}>
-								<div className='text-center py-10 space-y-3'>
-									<Brain className='w-12 h-12 text-text-secondary/30 mx-auto' />
-									<p className='text-text-primary font-semibold'>Tahlil uchun ma&apos;lumot yo&apos;q</p>
-									<p className='text-text-secondary text-sm'>Klinik holatlarni yechib boshlang</p>
-									<button onClick={() => router.push('/cases')} className='bg-primary text-secondary font-semibold px-5 py-2 rounded-xl text-sm'>
-										Keyslarni boshlash
-									</button>
+								<div className='flex items-center gap-3 mb-4'>
+									<div className='p-2.5 bg-primary/10 rounded-xl'><TrendingUp className='w-5 h-5 text-primary' /></div>
+									<h3 className='font-semibold text-text-primary'>Kuchli tomonlar</h3>
+								</div>
+								<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+									{effectiveAnalysis.strengths.map((s, i) => (
+										<div key={i} className='bg-primary/5 border border-primary/20 rounded-xl p-3'>
+											<div className='flex items-center justify-between mb-1'>
+												<p className='text-sm font-semibold text-text-primary capitalize'>{s.category}</p>
+												<span className='text-sm font-bold text-primary'>{s.avgScore}%</span>
+											</div>
+											<p className='text-xs text-text-secondary'>{s.count} ta urinish</p>
+											<div className='mt-2 w-full bg-surface-light rounded-full h-1.5'>
+												<div className='bg-primary h-1.5 rounded-full' style={{ width: `${s.avgScore}%` }} />
+											</div>
+										</div>
+									))}
 								</div>
 							</Card>
 						</motion.div>
-					) : (
-						<>
-							{/* Positive & Negative Aspects */}
-							<motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-								<Card hover={false}>
-									<div className='flex items-center gap-3 mb-4'>
-										<div className='p-2.5 bg-primary/10 rounded-xl'><CheckCircle className='w-5 h-5 text-primary' /></div>
-										<h3 className='font-semibold text-text-primary'>Ijobiy tomonlar</h3>
-									</div>
-									{analysis.positiveAspects.length === 0 ? (
-										<p className='text-sm text-text-secondary'>Hali baholash uchun yetarli ma&apos;lumot yo&apos;q</p>
-									) : (
-										<ul className='space-y-2'>
-											{analysis.positiveAspects.map((a, i) => (
-												<li key={i} className='flex items-start gap-2'>
-													<CheckCircle className='w-4 h-4 text-primary shrink-0 mt-0.5' />
-													<span className='text-sm text-text-primary'>{a}</span>
-												</li>
-											))}
-										</ul>
-									)}
-								</Card>
+					)}
 
-								<Card hover={false}>
-									<div className='flex items-center gap-3 mb-4'>
-										<div className='p-2.5 bg-accent/10 rounded-xl'><AlertTriangle className='w-5 h-5 text-accent' /></div>
-										<h3 className='font-semibold text-text-primary'>Salbiy tomonlar</h3>
-									</div>
-									{analysis.negativeAspects.length === 0 ? (
-										<p className='text-sm text-text-secondary'>Hali baholash uchun yetarli ma&apos;lumot yo&apos;q</p>
-									) : (
-										<ul className='space-y-2'>
-											{analysis.negativeAspects.map((a, i) => (
-												<li key={i} className='flex items-start gap-2'>
-													<AlertTriangle className='w-4 h-4 text-accent shrink-0 mt-0.5' />
-													<span className='text-sm text-text-primary'>{a}</span>
-												</li>
-											))}
-										</ul>
-									)}
-								</Card>
-							</motion.div>
+					{/* Weaknesses */}
+					{effectiveAnalysis.weaknesses.length > 0 && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<Card hover={false}>
+								<div className='flex items-center gap-3 mb-4'>
+									<div className='p-2.5 bg-accent/10 rounded-xl'><AlertTriangle className='w-5 h-5 text-accent' /></div>
+									<h3 className='font-semibold text-text-primary'>Zaif tomonlar (o&apos;rganish kerak)</h3>
+								</div>
+								<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+									{effectiveAnalysis.weaknesses.map((w, i) => (
+										<div key={i} className='bg-accent/5 border border-accent/20 rounded-xl p-3'>
+											<div className='flex items-center justify-between mb-1'>
+												<p className='text-sm font-semibold text-text-primary capitalize'>{w.category}</p>
+												<span className='text-sm font-bold text-accent'>{w.avgScore}%</span>
+											</div>
+											<p className='text-xs text-text-secondary'>{w.count} ta urinish</p>
+											<div className='mt-2 w-full bg-surface-light rounded-full h-1.5'>
+												<div className='bg-accent h-1.5 rounded-full' style={{ width: `${w.avgScore}%` }} />
+											</div>
+										</div>
+									))}
+								</div>
+							</Card>
+						</motion.div>
+					)}
 
-							{/* Strengths */}
-							{analysis.strengths.length > 0 && (
-								<motion.div initial='hidden' animate='visible' variants={fadeIn}>
-									<Card hover={false}>
-										<div className='flex items-center gap-3 mb-4'>
-											<div className='p-2.5 bg-primary/10 rounded-xl'><TrendingUp className='w-5 h-5 text-primary' /></div>
-											<h3 className='font-semibold text-text-primary'>Kuchli tomonlar</h3>
-										</div>
-										<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
-											{analysis.strengths.map((s, i) => (
-												<div key={i} className='bg-primary/5 border border-primary/20 rounded-xl p-3'>
-													<div className='flex items-center justify-between mb-1'>
-														<p className='text-sm font-semibold text-text-primary capitalize'>{s.category}</p>
-														<span className='text-sm font-bold text-primary'>{s.avgScore}%</span>
-													</div>
-													<p className='text-xs text-text-secondary'>{s.count} ta urinish</p>
-													<div className='mt-2 w-full bg-surface-light rounded-full h-1.5'>
-														<div className='bg-primary h-1.5 rounded-full' style={{ width: `${s.avgScore}%` }} />
-													</div>
-												</div>
-											))}
-										</div>
-									</Card>
-								</motion.div>
-							)}
-
-							{/* Weaknesses */}
-							{analysis.weaknesses.length > 0 && (
-								<motion.div initial='hidden' animate='visible' variants={fadeIn}>
-									<Card hover={false}>
-										<div className='flex items-center gap-3 mb-4'>
-											<div className='p-2.5 bg-accent/10 rounded-xl'><AlertTriangle className='w-5 h-5 text-accent' /></div>
-											<h3 className='font-semibold text-text-primary'>Zaif tomonlar (o&apos;rganish kerak)</h3>
-										</div>
-										<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
-											{analysis.weaknesses.map((w, i) => (
-												<div key={i} className='bg-accent/5 border border-accent/20 rounded-xl p-3'>
-													<div className='flex items-center justify-between mb-1'>
-														<p className='text-sm font-semibold text-text-primary capitalize'>{w.category}</p>
-														<span className='text-sm font-bold text-accent'>{w.avgScore}%</span>
-													</div>
-													<p className='text-xs text-text-secondary'>{w.count} ta urinish</p>
-													<div className='mt-2 w-full bg-surface-light rounded-full h-1.5'>
-														<div className='bg-accent h-1.5 rounded-full' style={{ width: `${w.avgScore}%` }} />
-													</div>
-												</div>
-											))}
-										</div>
-									</Card>
-								</motion.div>
-							)}
-
-							{/* Improving Areas */}
-{analysis.improving.length > 0 && (
+					{/* Improving Areas */}
+					{effectiveAnalysis.improving.length > 0 && (
 						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 							<Card hover={false}>
 								<div className='flex items-center gap-3 mb-4'>
@@ -215,50 +270,48 @@ export default function AnalysisPage() {
 									<h3 className='font-semibold text-text-primary'>Rivojlanayotgan sohalar</h3>
 								</div>
 								<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
-									{analysis.improving.map((a: { category: string; avgScore: number; recentScore: number }, i: number) => (
+									{effectiveAnalysis.improving.map((a, i) => (
 										<div key={i} className='bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3'>
 											<div className='flex items-center justify-between mb-1'>
 												<p className='text-sm font-semibold text-text-primary capitalize'>{a.category}</p>
 												<span className='text-sm font-bold text-yellow-500'>{a.avgScore}%</span>
 											</div>
 											<p className='text-xs text-text-secondary'>So&apos;nggi ball: {a.recentScore}%</p>
-												</div>
-											))}
 										</div>
-									</Card>
-								</motion.div>
-							)}
+									))}
+								</div>
+							</Card>
+						</motion.div>
+					)}
 
-							{/* Recommendations */}
-							{analysis.recommendations.length > 0 && (
-								<motion.div initial='hidden' animate='visible' variants={fadeIn}>
-									<Card hover={false}>
-										<div className='flex items-center gap-3 mb-4'>
-											<div className='p-2.5 bg-primary/10 rounded-xl'><Lightbulb className='w-5 h-5 text-primary' /></div>
-											<h3 className='font-semibold text-text-primary'>Tavsiyalar</h3>
-										</div>
-										<div className='space-y-3'>
-											{analysis.recommendations.map((rec, i) => (
-												<div key={i} className='p-4 bg-surface-light rounded-xl'>
-													<div className='flex items-center gap-2 mb-2'>
-														<BookOpen className='w-4 h-4 text-primary shrink-0' />
-														<p className='text-sm font-semibold text-text-primary capitalize'>{rec.category}</p>
-													</div>
-								<p className='text-sm text-text-secondary mb-3'>{rec.category} bo&apos;yicha o&apos;rtacha ball: {rec.avgScore}%</p>
-												{rec.suggestions?.length > 0 && (
-													<div className='flex flex-wrap gap-2'>
-														{rec.suggestions.map((t: string, j: number) => (
-																<span key={j} className='text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full'>{t}</span>
-															))}
-														</div>
-													)}
+					{/* Recommendations */}
+					{effectiveAnalysis.recommendations.length > 0 && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<Card hover={false}>
+								<div className='flex items-center gap-3 mb-4'>
+									<div className='p-2.5 bg-primary/10 rounded-xl'><Lightbulb className='w-5 h-5 text-primary' /></div>
+									<h3 className='font-semibold text-text-primary'>Tavsiyalar</h3>
+								</div>
+								<div className='space-y-3'>
+									{effectiveAnalysis.recommendations.map((rec, i) => (
+										<div key={i} className='p-4 bg-surface-light rounded-xl'>
+											<div className='flex items-center gap-2 mb-2'>
+												<BookOpen className='w-4 h-4 text-primary shrink-0' />
+												<p className='text-sm font-semibold text-text-primary capitalize'>{rec.category}</p>
+											</div>
+											<p className='text-sm text-text-secondary mb-3'>{rec.category} bo&apos;yicha o&apos;rtacha ball: {rec.avgScore}%</p>
+											{rec.suggestions?.length > 0 && (
+												<div className='flex flex-wrap gap-2'>
+													{rec.suggestions.map((t, j) => (
+														<span key={j} className='text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full'>{t}</span>
+													))}
 												</div>
-											))}
+											)}
 										</div>
-									</Card>
-								</motion.div>
-							)}
-						</>
+									))}
+								</div>
+							</Card>
+						</motion.div>
 					)}
 				</div>
 

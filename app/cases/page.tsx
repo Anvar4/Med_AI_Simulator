@@ -1,11 +1,11 @@
 'use client'
 
-import CaseCard from '@/components/cases/CaseCard'
-import Sidebar from '@/components/layout/Sidebar'
-import { api, BackendCase } from '@/lib/api'
-import { motion } from 'framer-motion'
-import { Filter, Loader2, Search } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import CaseCard from '@/components/cases/CaseCard';
+import Sidebar from '@/components/layout/Sidebar';
+import { api, BackendCase } from '@/lib/api';
+import { motion } from 'framer-motion';
+import { Filter, Loader2, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const types = [
 	{ value: 'all', label: 'Barchasi' },
@@ -41,6 +41,7 @@ export default function CasesPage() {
 				category: category === 'Barchasi' ? undefined : category,
 				type: type === 'all' ? undefined : type,
 				status: 'published',
+				withMedia: true,
 				limit: 50,
 			})
 			setCases(res.cases)
@@ -162,6 +163,7 @@ export default function CasesPage() {
 								<CaseCard
 									id={c._id}
 									title={c.title}
+									authorName={c.authorName}
 									category={c.category}
 									difficulty={c.difficulty}
 									type={c.type}
