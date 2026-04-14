@@ -1,16 +1,45 @@
-import express from 'express'
-import fs from 'fs'
-import multer from 'multer'
-import path from 'path'
+import express from 'express';
+import fs from 'fs';
+import multer from 'multer';
+import path from 'path';
 
-import { protect, restrictTo } from '../middleware/auth'
+import { protect, restrictTo } from '../middleware/auth';
 
 const router = express.Router()
 
+function resolveUploadDir(): string {
+  // Vercel serverless runtime allows writes only under /tmp.
+  if (process.env.VERCEL) {
+    return path.join('/tmp', 'uploads')
+  }
+
+  const candidates = [
+    path.join(process.cwd(), 'public', 'uploads'),
+    path.join(process.cwd(), '..', 'public', 'uploads'),
+    path.join(__dirname, '..', '..', 'public', 'uploads'),
+    path.join(__dirname, '..', '..', '..', 'public', 'uploads'),
+  ]
+
+  for (const dir of candidates) {
+    if (fs.existsSync(path.dirname(dir))) {
+      return dir
+    }
+  }
+
+  return candidates[0]
+}
+
 // Ensure uploads directory exists
-const uploadDir = path.join(__dirname, '..', '..', '..', 'public', 'uploads')
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true })
+let uploadDir = resolveUploadDir()
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true })
+  }
+} catch {
+  uploadDir = path.join('/tmp', 'uploads')
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true })
+  }
 }
 
 // Configure multer storage

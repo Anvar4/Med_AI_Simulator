@@ -103,7 +103,7 @@ const plans = [
 	},
 	{
 		name: 'PRO',
-		price: '79,000',
+		price: '40,000',
 		period: "so'm/oy",
 		description: 'Barcha klinik holatlar, AI tahlil, Karyera maslahat',
 		features: [
@@ -121,9 +121,9 @@ const plans = [
 		name: 'CLINIC B2B',
 		price: '2,500,000',
 		period: "so'm/oy",
-		description: '25 foydalanuvchi, boshqaruv panel',
+		description: '80 foydalanuvchi, boshqaruv panel',
 		features: [
-			'25 foydalanuvchi',
+			'80 foydalanuvchi',
 			'Boshqaruv paneli',
 			'Analitika dashboard',
 			'Maxsus klinik holatlar yaratish',

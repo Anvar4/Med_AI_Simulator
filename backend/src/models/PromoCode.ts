@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from 'mongoose'
+import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IPromoCode extends Document {
   code: string
@@ -31,7 +31,6 @@ const promoCodeSchema = new Schema<IPromoCode>(
   { timestamps: true }
 )
 
-promoCodeSchema.index({ code: 1 }, { unique: true })
 promoCodeSchema.index({ isActive: 1, expiresAt: 1 })
 
 export const PromoCode = mongoose.model<IPromoCode>('PromoCode', promoCodeSchema)

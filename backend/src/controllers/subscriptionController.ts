@@ -1,7 +1,7 @@
-import { Response } from 'express'
-import { AuthRequest } from '../middleware/auth'
-import { PromoCode } from '../models/PromoCode'
-import { User } from '../models/User'
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
+import { PromoCode } from '../models/PromoCode';
+import { User } from '../models/User';
 
 export const getPlans = (_req: AuthRequest, res: Response): void => {
   res.json({
@@ -34,13 +34,13 @@ export const getPlans = (_req: AuthRequest, res: Response): void => {
         currency: 'UZS',
         features: [
           'Pro versiyaning barcha imkoniyatlari',
-          '50 nafargacha foydalanuvchi',
+          '80 nafargacha foydalanuvchi',
           'Admin boshqaruv paneli',
           'Guruh statistikasi',
           'Promokod boshqaruv',
           'Ustuvor texnik qo\'llab-quvvatlash',
         ],
-        maxUsers: 50,
+        maxUsers: 80,
       },
       {
         id: 'university',

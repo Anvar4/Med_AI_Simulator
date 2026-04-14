@@ -1,101 +1,10 @@
-import cors from 'cors';
 import dotenv from 'dotenv';
-import express from 'express';
-import rateLimit from 'express-rate-limit';
-import helmet from 'helmet';
 import mongoose from 'mongoose';
-import path from 'path';
-
-import { errorHandler } from './middleware/errorHandler';
-import adminRoutes from './routes/admin';
-import attemptRoutes from './routes/attempts';
-import authRoutes from './routes/auth';
-import caseRoutes from './routes/cases';
-import chatRoutes from './routes/chat';
-import statsRoutes from './routes/stats';
-import subscriptionRoutes from './routes/subscriptions';
-import ttsRoutes from './routes/tts';
-import uploadRoutes from './routes/upload';
+import app from './app';
 
 dotenv.config()
 
-const app = express()
 const PORT = process.env.PORT || 5000
-const FALLBACK_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://med-ai-simulator.vercel.app',
-]
-
-const allowedOrigins = (process.env.CLIENT_ORIGINS || FALLBACK_ORIGINS.join(','))
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean)
-
-app.set('trust proxy', 1)
-
-// Security middleware
-app.use(
-  helmet({
-    // Frontend (3000) loads image assets from backend (5000) via /uploads.
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  })
-)
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true)
-      if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
-        return callback(null, true)
-      }
-      return callback(new Error('CORS: origin ruxsat etilmagan'))
-    },
-    credentials: true,
-  })
-)
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
-  message: { message: 'Juda ko\'p so\'rov. Keyinroq urinib ko\'ring.' },
-})
-app.use('/api', limiter)
-
-// Body parser — increased for base64 image uploads
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ limit: '50mb', extended: true }))
-
-// Serve uploaded files statically
-app.use('/uploads', express.static(path.join(__dirname, '..', '..', 'public', 'uploads')))
-
-// Routes
-app.use('/api/auth', authRoutes)
-app.use('/api/cases', caseRoutes)
-app.use('/api/attempts', attemptRoutes)
-app.use('/api/admin', adminRoutes)
-app.use('/api/stats', statsRoutes)
-app.use('/api/subscriptions', subscriptionRoutes)
-app.use('/api/tts', ttsRoutes)
-app.use('/api/upload', uploadRoutes)
-app.use('/api/chat', chatRoutes)
-
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  })
-})
-
-// 404
-app.use((_req, res) => {
-  res.status(404).json({ message: 'Endpoint topilmadi' })
-})
-
-// Error handler
-app.use(errorHandler)
 
 // Database connection & server start
 async function start() {
