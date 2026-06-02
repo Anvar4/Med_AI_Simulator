@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
-const DK = 'cdb60a48613d2dcf1de2c123a7919e200f01bb78'
+const DK = process.env.NEXT_PUBLIC_BIODIGITAL_DK ?? ''
 const dk = `dk=${DK}`
 
 // ─── All models with verified full src URLs ───────────────────────────────────

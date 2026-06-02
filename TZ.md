@@ -2,6 +2,27 @@
 
 ## Loyiha: **Med AI Simulator** — Sun'iy intellektga asoslangan tibbiy simulyator
 
+> **Hujjat versiyasi:** v2.0 · **Oxirgi yangilanish:** 2026-05-25
+> Ushbu hujjat loyihaning haqiqiy kod bazasiga (frontend `app/`, `components/`, `lib/` + backend `backend/src/`) muvofiqlashtirib yangilangan.
+
+---
+
+## MUNDARIJA
+
+1. [Loyiha maqsadi](#1-loyiha-maqsadi)
+2. [Biznes modeli](#2-biznes-modeli)
+3. [Texnik arxitektura](#3-texnik-arxitektura)
+4. [Funksional talablar](#4-funksional-talablar)
+5. [API endpointlari](#5-api-endpointlari)
+6. [Ma'lumotlar modeli](#6-malumotlar-modeli)
+7. [Xavfsizlik](#7-xavfsizlik)
+8. [Deploy va infratuzilma](#8-deploy-va-infratuzilma)
+9. [Loyiha yutuqlari](#9-loyiha-yutuqlari)
+10. [Ochiq vazifalar va yo'l xaritasi](#10-ochiq-vazifalar-va-yol-xaritasi)
+11. [Tizim talablari](#11-tizim-talablari)
+12. [Foydalanishni boshlash](#12-foydalanishni-boshlash)
+13. [Xulosa](#13-xulosa)
+
 ---
 
 ## 1. LOYIHA MAQSADI
@@ -27,7 +48,13 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 |-----------|--------|
 | Virtual bemor simulyatsiyasi | AI yordamida bemor bilan suhbat, TTS orqali ovozli javob |
 | Klinik keyslar | Diagnostika, jarrohlik, shoshilinch yordam bo'yicha turli murakkablikdagi keyslar |
+| Shoshilinch rejim | Vaqt cheklovi bilan tezkor qaror talab qiladigan alohida rejim |
+| 3D anatomiya simulyatori | BioDigital Human asosida interaktiv 3D model ko'rgichi |
 | AI baholash | OpenAI GPT-4o-mini orqali javoblarni tahlil qilish, ball berish (0-100) |
+| AI chatbot | Umumiy savol-javob va statistika asosida shaxsiy tahlil chati |
+| Tibbiy kutubxona | O'zbek/rus/ingliz tilidagi tibbiy kitoblar va manbalar |
+| Video kurslar | YouTube asosidagi tematik darslar |
+| Reyting jadvali | Foydalanuvchilar o'rtasida ball bo'yicha musobaqa |
 | Batafsil qayta aloqa | Kuchli tomonlar, kamchiliklar, to'g'ri javob bilan solishtirish |
 | Statistika va tahlil | O'sish dinamikasi, kategoriya bo'yicha natijalar, karyera yo'nalishi |
 
@@ -46,18 +73,23 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 
 ### 2.2 Obuna rejalari
 
-| Reja | Narx (oylik) | Imkoniyatlar |
-|------|-------------|--------------|
-| **Bepul** | 0 UZS | Asosiy keyslar, cheklangan miqdor |
-| **Pro** | 30,000 UZS | Barcha keyslar, AI tahlil, shoshilinch rejim, statistika |
-| **Klinika** | 3,000,000 UZS | Ko'p foydalanuvchi, tashkilot boshqaruvi, batafsil hisobot |
-| **Universitet** | Kelishiladi | Maxsus integratsiya, professor paneli, talabalar monitoringi |
+Narxlar yagona manbadan boshqariladi: `backend/src/controllers/subscriptionController.ts` (`PLAN_PRICES`).
+
+| Reja | Oylik narx | Yillik narx | Imkoniyatlar |
+|------|-----------|-------------|--------------|
+| **Bepul** (`free`) | 0 UZS | 0 UZS | Asosiy keyslar, cheklangan miqdor |
+| **Pro** (`pro`) | 30,000 UZS | 300,000 UZS | Barcha keyslar, AI tahlil, shoshilinch rejim, statistika |
+| **Klinika** (`clinic`) | 3,000,000 UZS | 30,000,000 UZS | Ko'p foydalanuvchi, tashkilot boshqaruvi, batafsil hisobot |
+| **Universitet** (`university`) | Kelishiladi | Kelishiladi | Maxsus integratsiya, professor paneli, talabalar monitoringi |
+
+> Yillik obunada chegirma qo'llaniladi (`subscribe` endpointida `discountPercent` orqali hisoblanadi).
 
 ### 2.3 Monetizatsiya kanallari
 
-1. **Obuna to'lovlari** — asosiy daromad manbai
+1. **Obuna to'lovlari** — asosiy daromad manbai (hozircha to'lov **manual** kelishiladi, avtomatik to'lov shlyuzi yo'q — [10-bo'lim](#10-ochiq-vazifalar-va-yol-xaritasi))
 2. **Klinika/Universitet litsenziyalari** — B2B segment
-3. **Promo-kodlar** — marketing kampaniyalari uchun (admin tomonidan generatsiya qilinadi)
+3. **Promo-kodlar** — marketing kampaniyalari uchun (admin tomonidan batch generatsiya qilinadi)
+4. **Referal tizimi** — `getReferralInfo` endpointi orqali taklif qilish
 
 ---
 
@@ -74,11 +106,12 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 ┌──────────────────────▼──────────────────────────────┐
 │              FRONTEND (Next.js 16)                   │
 │  ┌──────────┐ ┌──────────┐ ┌──────────────────────┐ │
-│  │  Pages   │ │Components│ │   Context/Hooks       │ │
+│  │  Pages   │ │Components│ │  Context/Hooks        │ │
 │  │ (App     │ │ (React   │ │ (Auth, Theme, i18n)   │ │
 │  │  Router) │ │  19)     │ │                       │ │
 │  └──────────┘ └──────────┘ └──────────────────────┘ │
-│           Vercel orqali deploy                       │
+│  Library PDF proxy: app/api/library/proxy            │
+│            Vercel orqali deploy (standalone)         │
 └──────────────────────┬──────────────────────────────┘
                        │ REST API
 ┌──────────────────────▼──────────────────────────────┐
@@ -88,58 +121,67 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 │  │          │ │           │ │ (Auth, RateLimit,    │ │
 │  │          │ │           │ │  Helmet, CORS)       │ │
 │  └──────────┘ └──────────┘ └──────────────────────┘ │
-└─────┬──────────────┬───────────────┬────────────────┘
-      │              │               │
-┌─────▼─────┐ ┌──────▼──────┐ ┌─────▼──────────┐
-│ MongoDB   │ │ OpenAI API  │ │ Aisha TTS API  │
-│ Atlas     │ │ (GPT-4o-    │ │ (O'zbek nutq   │
-│           │ │  mini)      │ │  sintezi)      │
-└───────────┘ └─────────────┘ └────────────────┘
+└──┬───────┬───────────┬────────────┬─────────────────┘
+   │       │           │            │
+┌──▼──┐ ┌──▼───┐ ┌─────▼─────┐ ┌────▼─────────┐
+│Mongo│ │OpenAI│ │ Aisha TTS │ │ Gmail SMTP   │
+│Atlas│ │GPT-  │ │ (uz nutq) │ │ (OTP email)  │
+│     │ │4o-mn │ │           │ │              │
+└─────┘ └──────┘ └───────────┘ └──────────────┘
+
+Tashqi (frontenddan): BioDigital Human (3D), YouTube (kurslar),
+                      unilibrary.uz / ziyonet.uz (kutubxona PDF)
 ```
 
 ### 3.2 Texnologiyalar steki
 
-#### Frontend
+#### Frontend (`package.json`)
 
 | Texnologiya | Versiya | Vazifasi |
 |-------------|---------|----------|
-| Next.js | 16.2.2 | App Router, SSR framework |
+| Next.js | ^16.2.3 | App Router, SSR framework (`output: 'standalone'`) |
 | React | 19.2.4 | UI kutubxonasi |
-| TypeScript | 5 | Tip xavfsizligi |
-| Tailwind CSS | 4 | Utility-first stillash |
-| Framer Motion | 12.38 | Animatsiyalar |
-| Lucide React | 1.7 | Ikonkalar |
-| @react-oauth/google | 0.13.4 | Google OAuth |
+| TypeScript | ^5 | Tip xavfsizligi |
+| Tailwind CSS | ^4 | Utility-first stillash |
+| Framer Motion | ^12.38 | Animatsiyalar |
+| Lucide React | ^1.7 | Ikonkalar |
+| @react-oauth/google | ^0.13.4 | Google OAuth |
+| react-markdown + remark-gfm | ^10.1 / ^4.0 | AI javoblar va matnlarni markdown render qilish |
 
-#### Backend
+#### Backend (`backend/package.json`)
 
 | Texnologiya | Versiya | Vazifasi |
 |-------------|---------|----------|
-| Express.js | 4.21.2 | HTTP server |
-| Mongoose | 8.9.5 | MongoDB ODM |
-| jsonwebtoken | 9.0.2 | JWT autentifikatsiya (7 kun amal muddati) |
-| bcryptjs | 2.4.3 | Parol xeshlash (salt: 12) |
-| OpenAI SDK | 6.33 | AI baholash (gpt-4o-mini) |
-| google-auth-library | 10.6.2 | Google OAuth tekshiruvi |
-| Nodemailer | 6.10.1 | Email OTP yuborish (Gmail) |
-| Multer | 1.4.5 | Fayl yuklash (max 50MB) |
-| Helmet | — | Xavfsizlik sarlavhalari |
-| express-rate-limit | — | 200 so'rov/15 daqiqa |
+| Express.js | ^4.21.2 | HTTP server |
+| Mongoose | ^8.9.5 | MongoDB ODM |
+| jsonwebtoken | ^9.0.2 | JWT autentifikatsiya (7 kun amal muddati) |
+| bcryptjs | ^2.4.3 | Parol xeshlash (salt: 12) |
+| OpenAI SDK | ^6.33 | AI baholash + chatbot (gpt-4o-mini) |
+| google-auth-library | ^10.6.2 | Google OAuth tekshiruvi |
+| Nodemailer | ^8.0.4 | Email OTP yuborish (Gmail) |
+| Multer | ^2.1.1 | Fayl yuklash (max 50MB) |
+| Helmet | ^8.0 | Xavfsizlik sarlavhalari |
+| express-rate-limit | ^7.5 | 200 so'rov / 15 daqiqa |
+| express-validator | ^7.2 | Kiruvchi ma'lumotlar validatsiyasi |
+| tsx | ^4.19 (dev) | TypeScript runtime (dev/seed) |
 
 #### Ma'lumotlar bazasi
 
 | Texnologiya | Xizmat |
 |-------------|--------|
-| MongoDB Atlas | Bulutli NoSQL baza |
+| MongoDB Atlas | Bulutli NoSQL baza (`mongodb+srv://`) |
 
 #### Tashqi API xizmatlari
 
 | Xizmat | Vazifasi |
 |--------|----------|
-| OpenAI GPT-4o-mini | Javoblarni baholash, batafsil tahlil |
+| OpenAI GPT-4o-mini | Javoblarni baholash, batafsil tahlil, chatbot |
 | Aisha Group TTS | O'zbek tilidagi nutq sintezi (gulnoza/jaxongir modellari) |
 | Gmail SMTP | OTP kodlarini email orqali yuborish |
 | Google OAuth | Ijtimoiy tarmoq orqali kirish |
+| BioDigital Human | 3D anatomiya modellari (frontend `NEXT_PUBLIC_BIODIGITAL_DK`) |
+| YouTube | Video kurslar (kurslar sahifasi) |
+| unilibrary.uz / ziyonet.uz | Kutubxona PDF manbalari (whitelisted proxy orqali) |
 
 ---
 
@@ -150,8 +192,8 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 #### Ro'yxatdan o'tish (4 bosqich)
 1. **Usul tanlash** — Email yoki Google OAuth
 2. **Shaxsiy ma'lumotlar** — Ism, familiya, mutaxassislik, universitet
-3. **Hisob yaratish** — Username (kichik harf, 6+ belgi), parol (6+ belgi)
-4. **Email tasdiqlash** — 6 raqamli OTP kod (10 daqiqa amal muddati)
+3. **Hisob yaratish** — Username (kichik harf + raqam, 6+ belgi), parol (6+ belgi)
+4. **Email tasdiqlash** — 6 raqamli OTP kod (TTL: 10 daqiqa)
 
 #### Kirish usullari
 - **Username + Parol** — an'anaviy kirish
@@ -162,27 +204,27 @@ Platforma quyidagi imkoniyatlarni taqdim etadi:
 | Rol (Backend) | Rol (Frontend) | Ruxsatlar |
 |---------------|----------------|-----------|
 | `student` | user | Keyslarni yechish, statistikani ko'rish |
-| `instructor` | content-manager | Keyslarni yaratish/tahrirlash, + student ruxsatlari |
+| `instructor` | content-manager | Keyslarni yaratish/tahrirlash, media yuklash + student ruxsatlari |
 | `admin` | admin | To'liq boshqaruv: foydalanuvchilar, promo-kodlar, keyslar |
 
 #### Xavfsiz o'zgarishlar (OTP talab qilinadi)
 - Parol o'zgartirish
 - Email o'zgartirish
-- Username o'zgartirish
+- Parolni tiklash (forgot-password)
 
 ---
 
 ### 4.2 Klinik keyslar tizimi
 
-#### Klinig keys tuzilmasi
+#### Klinik keys tuzilmasi
 
 ```
 Case
-├── Asosiy: sarlavha, kategoriya, murakkablik (1-5), tur
-├── Bemor: ism, yosh, jins, shikoyatlar, anamnez
+├── Asosiy: caseId, sarlavha, kategoriya, murakkablik (1-5), tur
+├── Bemor: ism, yosh, jins, yosh guruhi, shikoyatlar, anamnez
 ├── Vital belgilar: AD, puls, harorat, SpO2
-├── Tibbiy media: rentgen, EKG rasmlari
-├── Laboratoriya: tahlil natijalari (norma/yuqori/past/kritik)
+├── Tibbiy media: rentgen, EKG (base64 yoki URL)
+├── Laboratoriya: tahlil natijalari (normal/yuqori/past/kritik)
 ├── To'g'ri javob: tashxis + davolash rejasi
 └── Meta: status, premium, yaratuvchi, vaqt chegarasi
 ```
@@ -191,12 +233,12 @@ Case
 
 | Tur | Tavsif | Vaqt chegarasi |
 |-----|--------|----------------|
-| **Diagnostika** | Tashxis qo'yish va davolash rejasi | 10 daqiqa (standart) |
-| **Jarrohlik** | Jarrohlik amaliyoti kerak bo'lgan holatlar | 10 daqiqa |
-| **Shoshilinch** | Tezkor qaror talab qiladigan favqulodda holatlar | 5 daqiqa |
+| **diagnostika** | Tashxis qo'yish va davolash rejasi | `timeLimit` (default 600 s) |
+| **jarrohlik** | Jarrohlik amaliyoti kerak bo'lgan holatlar | `timeLimit` (default 600 s) |
+| **shoshilinch** | Tezkor qaror talab qiladigan favqulodda holatlar | `timeLimit` (default 300 s) |
 
 #### Keys kategoriyalari
-Kardiologiya, Pulmonologiya, Gastroenterologiya, Nevrologiya, Endokrinologiya, Travmatologiya va boshqalar (dinamik, backend tomonidan boshqariladi).
+Kardiologiya, Pulmonologiya, Gastroenterologiya, Nevrologiya, Endokrinologiya, Travmatologiya va boshqalar. Kategoriyalar **dinamik** — `Category` modeli orqali backendda boshqariladi (`GET /api/cases/categories`).
 
 #### Keys holatlari (status)
 
@@ -221,9 +263,9 @@ draft → review → published
 ```
 1. KEYSNI TANLASH
    └─ Kategoriya, tur, murakkablik bo'yicha filtrlash
-   
+
 2. SIMULYATSIYANI BOSHLASH
-   ├─ Taymer ishga tushadi
+   ├─ Taymer ishga tushadi (timeLimit asosida)
    ├─ Bemor ma'lumotlari ko'rinadi
    └─ PatientSimulator suhbat boshlanadi (TTS bilan)
 
@@ -269,87 +311,112 @@ draft → review → published
 
 - **Yozuv animatsiyasi** — bemor javoblari harf-harf yoziladi
 - **Ovozli javob** — Aisha TTS API orqali o'zbek tilida nutq sintezi
-- **Ovoz modellari:**
-  - `gulnoza` — ayol bemor uchun
-  - `jaxongir` — erkak bemor uchun
+- **Ovoz modellari:** `gulnoza` (ayol bemor), `jaxongir` (erkak bemor)
 - **Bemor avatari** — `patientgif.mp4` video (cheksiz takrorlanuvchi)
 - **Og'riq animatsiyasi** — bemor holati vizual ko'rsatiladi
 
 ---
 
-### 4.5 Sahifalar va funksiyalar
+### 4.5 3D anatomiya simulyatori (`/simulator`) — YANGI
 
-#### 4.5.1 Bosh sahifa (`/`)
+- **BioDigital Human Viewer** — `iframe` orqali interaktiv 3D model
+- **Komponentlar:** `components/simulator/BioDigitalViewer.tsx`, `components/simulator/ControlsPanel.tsx`
+- **Model toifalari:** anatomiya, organ, tizim, kasallik (`BIODIGITAL_MODELS`)
+- **Imkoniyatlar:** model qidirish, kategoriya bo'yicha tanlash, fullscreen rejim, panelni yopish/ochish
+- **Konfiguratsiya:** `NEXT_PUBLIC_BIODIGITAL_DK` developer key (frontend `.env.local`). Key bo'sh bo'lsa viewer xato holatini ko'rsatadi.
 
-| Bo'lim | Tavsif |
-|--------|--------|
-| Hero | Asosiy sarlavha, tushuntirish, CTA tugmalari |
-| Imkoniyatlar | 6 ta asosiy xususiyat kartasi |
-| Qanday ishlaydi | 4 bosqichli tushuntirish |
-| Narxlar | 3 ta obuna rejasi solishtirish |
-| Fikrlar | 3 ta foydalanuvchi sharhi |
-| CTA | Hoziroq boshlash chaqiruvi |
+---
 
-#### 4.5.2 Dashboard (`/dashboard`)
+### 4.6 AI chatbot va tahlil (`/analysis` + ChatWidget) — YANGI
+
+- **Suzuvchi chatbot** (`components/ChatWidget.tsx`) — har sahifada umumiy AI yordamchi
+- **Tahlil sahifasi** (`/analysis`) — foydalanuvchi statistikasi konteksti bilan AI suhbat
+- **Backend:** `POST /api/chat` (umumiy), `POST /api/chat/analysis` (statistika konteksti)
+- **Modeli:** OpenAI gpt-4o-mini (`backend/src/controllers/chatController.ts`)
+
+---
+
+### 4.7 Tibbiy kutubxona (`/library`, `/library/read`) — YANGI
+
+- **Kitoblar katalogi** — `lib/library-data.ts` (`BOOKS`, `CATEGORIES`)
+- **Tillar:** O'zbek (`uz`), Rus (`ru`), Ingliz (`en`)
+- **O'qish rejimi** — `/library/read` ichida PDF ko'rgich
+- **Xavfsiz PDF proxy** — `app/api/library/proxy/route.ts`:
+  - Faqat whitelisted hostlar: `api.unilibrary.uz`, `api.ziyonet.uz`
+  - Faqat `https://` va `.pdf` kengaytmali manbalar
+  - `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`
+
+---
+
+### 4.8 Video kurslar (`/kurslar`) — YANGI
+
+- YouTube asosidagi tematik darslar ro'yxati (`LESSONS`)
+- Har bir dars: sarlavha, tavsif, YouTube havola
+- Muallif ko'rsatkichi
+
+---
+
+### 4.9 Reyting jadvali (`/leaderboard`) — YANGI
+
+- Foydalanuvchilarni umumiy ball bo'yicha tartiblash
+- Top-3 uchun medal belgilari (oltin/kumush/bronza)
+- Joriy foydalanuvchining o'z reytingi ajratib ko'rsatiladi
+- Avatar (Google rasmi yoki bosh harflar), sarflangan vaqt
+- **Backend:** `GET /api/stats/leaderboard` (`getLeaderboard`)
+
+---
+
+### 4.10 Shoshilinch rejim (`/emergency`) — YANGI
+
+- `type: 'shoshilinch'` keyslarning alohida sahifasi
+- Vaqt cheklovi (default 300 s, keys `timeLimit` asosida)
+- Qidiruv, kategoriya va murakkablik bo'yicha filtr
+- Premium keyslar qulflangan ko'rinishda
+
+---
+
+### 4.11 Obuna sahifasi (`/subscription`) — YANGI
+
+- Oylik/yillik to'lov davri almashtirgich
+- Reja solishtirish (Bepul / Pro / Klinika / Universitet)
+- Promo-kod qo'llash va chegirma ko'rsatish
+- **To'lov:** hozircha **manual** — obuna so'rovi yuborilgach, admin bilan to'lov kelishiladi (click/payme yoki bank o'tkazmasi)
+
+---
+
+### 4.12 Asosiy sahifalar
+
+#### Bosh sahifa (`/`)
+Hero, imkoniyatlar, "qanday ishlaydi", narxlar, fikrlar, CTA bo'limlari.
+
+#### Dashboard (`/dashboard`)
 
 | Element | Ma'lumot manbai |
 |---------|-----------------|
 | Statistika kartalari | Jami keyslar, o'rtacha ball, haftalik soni, streak |
-| Haftalik faollik grafigi | Oxirgi 7 kun davomida yechilgan keyslar |
+| Haftalik faollik grafigi | Oxirgi 7 kun (`ActivityChart`) |
 | Kategoriya bo'yicha o'sish | Har bir kategoriya uchun o'rtacha ball |
 | Davom ettirish | Oxirgi tugallanmagan keys |
-| Tavsiya qilingan keyslar | Eng so'nggi 3 ta nashr qilingan keys |
+| Tavsiya qilingan keyslar | Eng so'nggi nashr qilingan keyslar |
 
-#### 4.5.3 Keyslar ro'yxati (`/cases`)
+#### Keyslar ro'yxati (`/cases`, `/cases/[id]`)
+- Real-time qidiruv (debounce), kategoriya/tur filtrlari
+- Dinamik kategoriyalar (backenddan), premium qulf belgisi
+- `[id]` — keys tafsiloti va simulyatsiya boshlash
 
-- **Qidiruv** — 400ms debounce bilan real-time qidiruv
-- **Filtrlar** — kategoriya, tur (diagnostika/jarrohlik/shoshilinch)
-- **Dinamik kategoriyalar** — backenddan kategoriya va soni yuklanadi
-- **Premium belgisi** — PRO keyslar qulflangan holda ko'rsatiladi
+#### Statistika (`/statistics`)
+Umumiy ko'rsatkichlar, oylik faollik, kategoriya natijalari, murakkablik tahlili, ball taqsimoti.
 
-#### 4.5.4 Statistika (`/statistics`)
+#### Karyera (`/career`)
+Yo'nalishlar, ko'nikmalar radar grafigi, yutuqlar, yo'l xaritasi.
 
-| Bo'lim | Tavsif |
-|--------|--------|
-| Umumiy ko'rsatkichlar | Jami urinishlar, o'rtacha ball, sarflangan vaqt |
-| Oylik faollik | Oxirgi 6 oy grafigi |
-| Kategoriya natijalari | Har bir kategoriya bo'yicha progress bar |
-| Murakkablik tahlili | 1-5 daraja bo'yicha natijalar |
-| Ball taqsimoti | 0-100 oralig'ida band tahlili |
+#### Sozlamalar (`/settings`)
+Profil tahrirlash, parol/email o'zgartirish (OTP), bildirishnomalar, mavzu, til, promo-kod.
 
-#### 4.5.5 Karyera (`/career`)
+#### Kontent menejeri (`/content-manager`)
+Keyslar ro'yxati, keys yaratish/tahrirlash (`NewCaseModal`), media yuklash (rasm/video).
 
-| Bo'lim | Tavsif |
-|--------|--------|
-| Yo'nalishlar | Kardiolog, Pediatr, Nevrolog, Jarroh tavsiyalari |
-| Ko'nikmalar | Kategoriya bo'yicha radar grafik |
-| Yutuqlar | Bosqichma-bosqich muvaffaqiyatlar |
-| Yo'l xaritasi | Keyingi bosqichga erishish ko'rsatkichi |
-
-#### 4.5.6 Sozlamalar (`/settings`)
-
-| Funksiya | Tavsif |
-|----------|--------|
-| Profil tahrirlash | Ism, mutaxassislik, universitet |
-| Parol o'zgartirish | OTP orqali tasdiqlash |
-| Email o'zgartirish | OTP orqali tasdiqlash |
-| Username o'zgartirish | OTP orqali tasdiqlash |
-| Bildirishnomalar | Email, push, marketing sozlamalari |
-| Mavzu | Qorong'u/Yorug' rejim almashtirish |
-| Til | O'zbek/Ingliz/Rus |
-| Promo-kod | Obuna uchun promo-kodni kiritish |
-
-#### 4.5.7 Kontent menejeri (`/content-manager`)
-
-| Funksiya | Tavsif |
-|----------|--------|
-| Keyslar ro'yxati | Yaratilgan keyslar jadvali |
-| Keys yaratish | To'liq forma: bemor, vital, media, labratoriya, javob |
-| Keys tahrirlash | Mavjud keysni o'zgartirish |
-| Media yuklash | Rasm (JPEG/PNG/GIF/WebP) va video (MP4/WebM) yuklash |
-| Keys turlari | Diagnostika, jarrohlik, shoshilinch holat |
-
-#### 4.5.8 Admin panel (`/admin`)
+#### Admin panel (`/admin`)
 
 | Tab | Funksiya |
 |-----|----------|
@@ -359,12 +426,12 @@ draft → review → published
 
 ---
 
-### 4.6 Fayl yuklash tizimi
+### 4.13 Fayl yuklash tizimi
 
 | Parametr | Qiymat |
 |----------|--------|
 | Yo'l | `POST /api/upload` |
-| Saqlash | `public/uploads/` papkasi (lokal disk) |
+| Saqlash | `public/uploads/` (lokal); Vercelda `/tmp/uploads` |
 | Formatlar | JPEG, PNG, GIF, WebP, MP4, WebM |
 | Max hajm | 50 MB |
 | Ruxsat | Faqat instructor va admin |
@@ -372,33 +439,35 @@ draft → review → published
 
 ---
 
-### 4.7 Xalqarolashtirish (i18n)
+### 4.14 Xalqarolashtirish (i18n)
 
 | Til | Kod | Holat |
 |-----|-----|-------|
-| O'zbek | `uz` | ✅ Asosiy til, 150+ kalit |
-| Ingliz | `en` | ✅ To'liq tarjima |
-| Rus | `ru` | ✅ To'liq tarjima |
+| O'zbek | `uz` | ✅ Asosiy til |
+| Ingliz | `en` | ✅ Tarjima mavjud |
+| Rus | `ru` | ✅ Tarjima mavjud |
 
-Amalga oshirish: `lib/i18n.ts` — `t(key, locale)` funksiyasi orqali kalit-qiymat tarjima.
+- Amalga oshirish: `lib/i18n.ts` — `t(key, locale)` va `getLocale()` funksiyalari
+- **Holat:** lug'at to'liq tayyor, ammo barcha sahifalarda **to'liq qo'llanmagan** (ko'p matn hali statik). [10-bo'limga](#10-ochiq-vazifalar-va-yol-xaritasi) qarang.
 
 ---
 
-### 4.8 Mavzu (tema) tizimi
+### 4.15 Mavzu (tema) tizimi
 
 | Rejim | Tavsif |
 |-------|--------|
-| **Qorong'u** (standart) | Asosiy ranglar: #242938, #2e3447, matn #f0f4ff |
-| **Yorug'** | Asosiy ranglar: #ffffff, #eef1f6, matn #1a1f2e |
+| **Qorong'u** (standart) | To'q ranglar palitrasi |
+| **Yorug'** | Och ranglar palitrasi |
 
-- CSS o'zgaruvchilari orqali amalga oshirilgan
-- `localStorage` da saqlanadi
-- FOUC (Flash of Unstyled Content) oldini olish uchun inline skript
+- CSS o'zgaruvchilari orqali (`app/globals.css`), `lib/theme-context.tsx` orqali boshqariladi
+- `localStorage` da saqlanadi, FOUC oldini olish uchun inline skript
 - Sozlamalar sahifasidagi toggle bilan boshqariladi
 
 ---
 
 ## 5. API ENDPOINTLARI
+
+Backend mount nuqtalari: `backend/src/app.ts`.
 
 ### 5.1 Autentifikatsiya (`/api/auth`)
 
@@ -444,8 +513,26 @@ Amalga oshirish: `lib/i18n.ts` — `t(key, locale)` funksiyasi orqali kalit-qiym
 |------|----------|------|--------|
 | GET | `/me` | ✅ | Batafsil statistika |
 | GET | `/analysis` | ✅ | Kuchli/zaif tomonlar tahlili |
+| GET | `/leaderboard` | ✅ | Reyting jadvali |
 
-### 5.5 Admin (`/api/admin`)
+### 5.5 AI Chat (`/api/chat`)
+
+| Usul | Endpoint | Auth | Tavsif |
+|------|----------|------|--------|
+| POST | `/` | ✅ | Umumiy AI chatbot |
+| POST | `/analysis` | ✅ | Statistika konteksti bilan AI tahlil |
+
+### 5.6 Obuna (`/api/subscriptions`)
+
+| Usul | Endpoint | Auth | Tavsif |
+|------|----------|------|--------|
+| GET | `/plans` | — | Reja narxlari |
+| GET | `/my` | ✅ | Joriy obuna holati |
+| GET | `/referral` | ✅ | Referal ma'lumotlari |
+| POST | `/apply-promo` | ✅ | Promo-kod qo'llash |
+| POST | `/subscribe` | ✅ | Obuna so'rovi |
+
+### 5.7 Admin (`/api/admin`)
 
 | Usul | Endpoint | Auth | Tavsif |
 |------|----------|------|--------|
@@ -456,25 +543,31 @@ Amalga oshirish: `lib/i18n.ts` — `t(key, locale)` funksiyasi orqali kalit-qiym
 | GET | `/promo-codes` | admin | Promo-kodlar ro'yxati |
 | GET | `/promo-codes/export` | admin | CSV eksport |
 
-### 5.6 Boshqa
+### 5.8 Boshqa (backend)
 
 | Usul | Endpoint | Auth | Tavsif |
 |------|----------|------|--------|
 | POST | `/api/tts` | ✅ | O'zbek nutq sintezi (Aisha API) |
 | POST | `/api/upload` | instructor/admin | Fayl yuklash |
-| POST | `/api/subscriptions/apply-promo` | ✅ | Promo-kod qo'llash |
-| POST | `/api/subscriptions/subscribe` | ✅ | Obuna bo'lish |
 | GET | `/api/health` | — | Server holati |
+
+### 5.9 Frontend API route
+
+| Usul | Endpoint | Tavsif |
+|------|----------|--------|
+| GET | `/api/library/proxy?url=...` | Whitelisted tibbiy PDF proxy (Next.js route) |
 
 ---
 
 ## 6. MA'LUMOTLAR MODELI
 
-### 6.1 User (Foydalanuvchi)
+Manba: `backend/src/models/`.
+
+### 6.1 User
 
 ```
 User {
-  username:    String (unique, /^[a-z0-9]{6,}$/)
+  username:    String (unique, kichik harf + raqam, 6+ belgi)
   firstName:   String
   lastName:    String
   email:       String (unique)
@@ -485,12 +578,7 @@ User {
   avatar:      String
   specialty:   String
   university:  String
-  stats: {
-    totalCases:  Number
-    avgScore:    Number
-    weeklyCount: Number
-    streak:      Number
-  }
+  stats: { totalCases, avgScore, weeklyCount, streak }
   isPremium:   Boolean
   subscription: {
     plan:      "free" | "pro" | "clinic" | "university"
@@ -498,22 +586,12 @@ User {
     expiresAt: Date
     organizationName: String
   }
-  preferences: {
-    darkMode:   Boolean
-    sound:      Boolean
-    animations: Boolean
-    language:   "uz" | "en" | "ru"
-    autoSave:   Boolean
-  }
-  notifications: {
-    email:     Boolean
-    push:      Boolean
-    marketing: Boolean
-  }
+  preferences:  { darkMode, sound, animations, language, autoSave }
+  notifications:{ email, push, marketing }
 }
 ```
 
-### 6.2 Case (Klinik keys)
+### 6.2 Case
 
 ```
 Case {
@@ -525,76 +603,63 @@ Case {
   isPremium:   Boolean
   status:      "draft" | "review" | "published" | "rejected"
   patient: {
-    name:       String
-    age:        Number
-    gender:     String
-    ageGroup:   String
-    complaints: String
-    history:    String
-    vitals: {
-      bloodPressure: String
-      heartRate:     Number
-      temperature:   Number
-      oxygenLevel:   Number
-    }
+    name, age, gender, ageGroup, complaints, history,
+    vitals: { bloodPressure, heartRate, temperature, oxygenLevel }
   }
-  mediaItems: [{
-    type:     "xray" | "ekg"
-    fileData: String (base64 yoki URL)
-    comment:  String
-  }]
-  labResults: [{
-    name:   String
-    value:  String
-    unit:   String
-    range:  String
-    status: "normal" | "yuqori" | "past" | "kritik"
-  }]
+  mediaItems:  [{ type: "xray"|"ekg", fileData, comment }]
+  labResults:  [{ name, value, unit, range, status: normal|yuqori|past|kritik }]
   correctDiagnosis: String
   correctTreatment: String
-  timeLimit:  Number (default: 600 sekund)
-  createdBy:  ObjectId → User
+  timeLimit:   Number (default 600 s; shoshilinch uchun odatda 300 s)
+  createdBy:   ObjectId → User
 }
 ```
 
-### 6.3 CaseAttempt (Urinish)
+### 6.3 CaseAttempt
 
 ```
 CaseAttempt {
-  user:       ObjectId → User
-  case:       ObjectId → Case
-  status:     "in-progress" | "completed" | "abandoned"
+  user, case:    ObjectId
+  status:        "in-progress" | "completed" | "abandoned"
   selectedTests: [String]
-  diagnosis:  String
-  treatment:  String
-  score:      Number (0-100)
-  aiFeedback: String
-  timeSpent:  Number (sekund)
-  completedSteps: [String]
+  diagnosis, treatment: String
+  score:         Number (0-100)
+  aiFeedback:    String
+  timeSpent:     Number (sekund)
+  completedSteps:[String]
 }
 ```
 
-### 6.4 OTP
+### 6.4 Category — YANGI
+
+```
+Category {
+  name: String (unique, trim)
+  timestamps: createdAt, updatedAt
+}
+```
+Dinamik kategoriyalarni boshqaradi; keyslar `category` maydoni shu nomlarga ishora qiladi.
+
+### 6.5 OTP
 
 ```
 OTP {
   email:    String
-  code:     String (6 raqamli)
+  code:     String (6 raqam)
   type:     "register" | "password-reset" | "password-change" | "email-change"
-  tempData: Mixed (vaqtinchalik ma'lumotlar)
-  expiresAt: Date (TTL: 10 daqiqa, avtomatik o'chish)
+  tempData: Mixed
+  expiresAt:Date (TTL 10 daqiqa, avtomatik o'chish)
 }
 ```
 
-### 6.5 PromoCode
+### 6.6 PromoCode
 
 ```
 PromoCode {
   code:       String (unique, 8 belgi, KATTA HARF)
   type:       "pro" | "clinic" | "university"
   duration:   Number (oylar)
-  maxUses:    Number
-  usedCount:  Number
+  maxUses, usedCount: Number
   usedBy:     [ObjectId → User]
   organizationName: String
   expiresAt:  Date
@@ -612,19 +677,26 @@ PromoCode {
 |-------|--------|
 | **JWT** | 7 kunlik amal muddati, Bearer token sxemasi |
 | **Bcrypt** | Parol xeshlash (salt factor: 12) |
-| **Helmet** | HTTP xavfsizlik sarlavhalari |
-| **CORS** | Origin tekshiruvi (origin whitelist) |
+| **Helmet** | HTTP xavfsizlik sarlavhalari (`crossOriginResourcePolicy: cross-origin`) |
+| **CORS** | Origin whitelist (`CLIENT_ORIGINS`) + `*.vercel.app` regex |
 | **Rate Limiting** | 200 so'rov / 15 daqiqa `/api` uchun |
-| **OTP** | 6 raqamli, 10 daqiqa amal muddati, TTL index |
+| **OTP** | 6 raqamli, 10 daqiqa, TTL index orqali avto-o'chirish |
 | **Rol asosidagi kirish** | `protect` va `restrictTo` middleware |
 | **Fayl filtrlash** | Faqat ruxsat berilgan MIME turlar (rasm/video) |
-| **Input validatsiya** | Username/parol regex, email format tekshiruvi |
+| **Input validatsiya** | express-validator, username/parol regex, email format |
+| **PDF proxy whitelist** | Faqat ishonchli host + `https` + `.pdf` (`library/proxy`) |
+| **Frontend 401 auto-reset** | Muddati tugagan sessiya avtomatik tozalanadi (`lib/api.ts`) |
+| **trust proxy** | `app.set('trust proxy', 1)` — proksi orqasida to'g'ri IP |
 
 ### 7.2 Autentifikatsiya oqimi
 
 ```
-Email → OTP (6 raqam, 10 min) → tempToken (15 min) → JWT (7 kun)
+Email → OTP (6 raqam, 10 min) → tempToken → JWT (7 kun)
 ```
+
+### 7.3 Xavfsizlik bo'yicha eslatma (kod bazasida)
+
+> ⚠️ `backend/.env` faylida real maxfiy kalitlar (MongoDB parol, OPENAI_API_KEY, Gmail app password, AISHA_API_KEY) saqlanmoqda. Bu fayl **hech qachon git'ga kommit qilinmasligi** kerak (`.gitignore` da bo'lishi shart). Kalitlar oshkor bo'lgan bo'lsa — **rotatsiya** qilish tavsiya etiladi.
 
 ---
 
@@ -632,24 +704,44 @@ Email → OTP (6 raqam, 10 min) → tempToken (15 min) → JWT (7 kun)
 
 | Komponent | Platforma | Tavsif |
 |-----------|-----------|--------|
-| Frontend | Vercel | Next.js 16 SSR, avtomatik deploy |
-| Backend | Alohida server | Express.js, Node.js runtime |
+| Frontend | Vercel | Next.js 16 SSR, `output: 'standalone'` |
+| Backend | Alohida server / PM2 | Express.js, Node.js runtime |
 | Ma'lumotlar bazasi | MongoDB Atlas | Bulutli klaster |
-| Fayl saqlash | Lokal disk | `public/uploads/` papkasi |
-| DNS | Vercel | Avtomatik SSL |
+| Fayl saqlash | Lokal disk / `/tmp` (Vercel) | `public/uploads/` |
+| DNS / SSL | Vercel | Avtomatik |
 
-### 8.1 Muhit o'zgaruvchilari (Backend)
+### 8.1 PM2 bilan deploy
 
+```bash
+npm run build:all
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+### 8.2 Muhit o'zgaruvchilari
+
+**Backend (`backend/.env`)** — namuna: `backend/.env.example`
 ```
 PORT=5000
+NODE_ENV=production
 MONGODB_URI=mongodb+srv://...
 JWT_SECRET=...
+JWT_EXPIRES_IN=7d
+CLIENT_ORIGINS=https://domeningiz.uz,http://localhost:3000
 OPENAI_API_KEY=sk-proj-...
+OPENAI_MODEL=gpt-4o-mini
 AISHA_API_KEY=...
-EMAIL_USER=...@gmail.com
-EMAIL_PASS=...
 GOOGLE_CLIENT_ID=...
-FRONTEND_URL=http://localhost:3000
+GMAIL_USER=...@gmail.com
+GMAIL_APP_PASSWORD=...
+FRONTEND_URL=https://domeningiz.uz
+```
+
+**Frontend (`.env.local`)** — namuna: `.env.example`
+```
+NEXT_PUBLIC_API_URL=https://api.domeningiz.uz/api
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=...
+NEXT_PUBLIC_BIODIGITAL_DK=...   # BioDigital developer key (3D simulator uchun)
 ```
 
 ---
@@ -660,16 +752,18 @@ FRONTEND_URL=http://localhost:3000
 
 | # | Yutuq | Tavsif |
 |---|-------|--------|
-| 1 | **AI integratsiya** | OpenAI GPT-4o-mini orqali real-time baholash va batafsil tahlil |
-| 2 | **O'zbek TTS** | Aisha API orqali tabiy ovozli bemor simulyatsiyasi |
-| 3 | **To'liq autentifikatsiya** | OTP, JWT, Google OAuth, xavfsiz o'zgarishlar |
-| 4 | **Real-time simulyatsiya** | Taymer, bosqichma-bosqich oqim, interaktiv UI |
-| 5 | **Responsive dizayn** | Mobil, planshet va desktop uchun moslashtirilgan |
-| 6 | **Qorong'u/Yorug' rejim** | CSS o'zgaruvchilari bilan tezkor almashtirish |
-| 7 | **Ko'p tilli** | O'zbek, Ingliz, Rus tillari qo'llab-quvvatlanadi |
-| 8 | **Zamonaviy stek** | Next.js 16, React 19, Tailwind v4 — eng so'nggi texnologiyalar |
-| 9 | **Admin boshqaruvi** | Foydalanuvchilar, keyslar, promo-kodlar to'liq CRUD |
-| 10 | **Batafsil statistika** | Oylik, kategoriya, murakkablik bo'yicha tahlil |
+| 1 | **AI baholash** | OpenAI GPT-4o-mini orqali real-time baholash va batafsil tahlil |
+| 2 | **AI chatbot** | Suzuvchi yordamchi + statistika asosida shaxsiy tahlil |
+| 3 | **O'zbek TTS** | Aisha API orqali tabiiy ovozli bemor simulyatsiyasi |
+| 4 | **3D anatomiya** | BioDigital Human asosidagi interaktiv 3D simulator |
+| 5 | **Tibbiy kutubxona** | Whitelisted PDF proxy bilan xavfsiz kitob ko'rgich |
+| 6 | **Reyting jadvali** | Foydalanuvchilar o'rtasida geymifikatsiya |
+| 7 | **To'liq autentifikatsiya** | OTP, JWT, Google OAuth, xavfsiz o'zgarishlar |
+| 8 | **Responsive dizayn** | Mobil, planshet va desktop uchun moslashtirilgan |
+| 9 | **Qorong'u/Yorug' rejim** | CSS o'zgaruvchilari bilan tezkor almashtirish |
+| 10 | **Zamonaviy stek** | Next.js 16, React 19, Tailwind v4 |
+| 11 | **Admin boshqaruvi** | Foydalanuvchilar, keyslar, promo-kodlar to'liq CRUD |
+| 12 | **Env-asoslangan konfiguratsiya** | Barcha URL/kalitlar muhit o'zgaruvchilarida |
 
 ### 9.2 Biznes yutuqlari
 
@@ -678,48 +772,55 @@ FRONTEND_URL=http://localhost:3000
 | 1 | **Bozorda birinchi** | O'zbekistonda tibbiy AI simulyator yo'q |
 | 2 | **Skalanuvchi model** | Bepul → Pro → Klinika → Universitet pog'onalari |
 | 3 | **B2B imkoniyat** | Klinika va universitetlar uchun korporativ litsenziya |
-| 4 | **Promo tizim** | Marketing kampaniyalari uchun batch promo-kod generatsiya |
+| 4 | **Promo + referal** | Marketing kampaniyalari uchun batch promo va referal |
 | 5 | **Lokal til** | O'zbek tilidagi interfeys va AI javoblar |
 
 ---
 
-## 10. MA'LUM KAMCHILIKLAR VA YECHIMLAR
+## 10. OCHIQ VAZIFALAR VA YO'L XARITASI
 
-### 10.1 Texnik kamchiliklar
+> Quyidagi ro'yxat kodning **hozirgi haqiqiy holatiga** muvofiq. Avvalgi TZ'da "kamchilik" sifatida ko'rsatilgan ba'zi bandlar (hardcoded URL, mock-data, narx nomuvofiqligi) allaqachon **bartaraf etilgan**.
 
-| # | Kamchilik | Xavf darajasi | Taklif qilingan yechim |
-|---|-----------|---------------|------------------------|
-| 1 | **Hardcoded localhost:5000** | 🔴 Yuqori | `NEXT_PUBLIC_API_URL` env o'zgaruvchisiga o'tish |
-| 2 | **Narx nomuvofiqlik** | 🟡 O'rta | Landing sahifa va backend narxlarini sinxronlashtirish |
-| 3 | **i18n integratsiya qilinmagan** | 🟡 O'rta | `t()` funksiyasini barcha sahifalarga qo'shish |
-| 4 | **Lokal fayl saqlash** | 🟡 O'rta | Ishlab chiqarishda S3/Cloudinary ga o'tish |
-| 5 | **SSR ishlatilmayapti** | 🟢 Past | Barcha sahifalar `'use client'` — SEO uchun SSR qo'shish |
-| 6 | **Mock data fayli** | 🟢 Past | `lib/mock-data.ts` ni o'chirish (boshqa ishlatilmayapti) |
-| 7 | **Karyera sahifasi statik** | 🟢 Past | Karyera yo'nalishlari va yutuqlarni backenddan olish |
-| 8 | **next.config.ts bo'sh** | 🟢 Past | Kerakli konfiguratsiyalarni qo'shish |
-| 9 | **To'lov integratsiyasi yo'q** | 🔴 Yuqori | Payme/Click/Stripe integratsiya qilish |
-| 10 | **Test yo'q** | 🔴 Yuqori | Unit va integration testlar yozish |
+### 10.1 Ochiq vazifalar
 
-### 10.2 Kamchiliklarni bartaraf etish rejasi
+| # | Vazifa | Ustuvorlik | Holat / Yechim |
+|---|--------|-----------|----------------|
+| 1 | **Avtomatik to'lov shlyuzi** | 🔴 Yuqori | Hozir to'lov manual. Payme/Click/Stripe integratsiyasi kerak |
+| 2 | **Avtomatik test qoplami** | 🔴 Yuqori | Unit + integration testlar yo'q (Jest/Vitest + RTL tavsiya) |
+| 3 | **Maxfiy kalitlar xavfsizligi** | 🔴 Yuqori | `backend/.env` git'da bo'lmasligini ta'minlash, kalitlarni rotatsiya |
+| 4 | **i18n to'liq qo'llash** | 🟡 O'rta | Lug'at tayyor, lekin sahifalarda matn hali ko'p statik |
+| 5 | **Bulutli fayl saqlash** | 🟡 O'rta | Lokal disk/`/tmp` o'rniga S3/Cloudinary (Vercelda `/tmp` vaqtinchalik) |
+| 6 | **SSR/SEO optimizatsiya** | 🟢 Past | Aksariyat sahifalar `'use client'` — muhim sahifalarga SSR |
+| 7 | **Karyera sahifasi dinamikasi** | 🟢 Past | Yo'nalish va yutuqlarni backenddan personallashtirish |
+| 8 | **Monitoring/Analytics** | 🟢 Past | Xato monitoringi (Sentry) va analitika (Mixpanel/GA) |
+| 9 | **CI/CD** | 🟢 Past | Avtomatik lint/test/build pipeline |
 
-#### Birinchi navbat (1-2 hafta)
+### 10.2 Bartaraf etilgan (avvalgi TZ kamchiliklari) ✅
 
-1. **To'lov integratsiyasi** — Payme yoki Click orqali obuna to'lovlarini avtomatlashtirish
-2. **Environment o'zgaruvchilari** — Barcha hardcoded URL larni env ga o'tkazish
-3. **Narxlarni sinxronlashtirish** — Yagona narx manbasi yaratish
+| Avvalgi kamchilik | Hozirgi holat |
+|-------------------|---------------|
+| Hardcoded `localhost:5000` | ✅ `NEXT_PUBLIC_API_URL` env orqali (`lib/api.ts`) |
+| `lib/mock-data.ts` ortiqcha | ✅ Olib tashlangan |
+| Narx nomuvofiqligi | ✅ Yagona manba: `PLAN_PRICES` (backend) |
+| Bo'sh `next.config.ts` | ✅ `output: 'standalone'` sozlangan |
+| i18n umuman yo'q | ⚠️ Qisman: lug'at to'liq, qo'llash davom etmoqda |
 
-#### Ikkinchi navbat (2-4 hafta)
+### 10.3 Yo'l xaritasi
 
-4. **i18n to'liq integratsiya** — Barcha sahifalarda `t()` funksiyasini qo'llash
-5. **Fayl saqlash** — S3 yoki Cloudinary ga migratsiya
-6. **Testlar** — Jest + React Testing Library bilan test qoplami
+**1-navbat (1-2 hafta)**
+1. Avtomatik to'lov (Payme/Click) integratsiyasi
+2. Maxfiy kalitlar audit + rotatsiya, `.gitignore` tekshiruvi
+3. Asosiy oqimlar uchun smoke testlar
 
-#### Uchinchi navbat (1-2 oy)
+**2-navbat (2-4 hafta)**
+4. i18n'ni barcha sahifalarda to'liq qo'llash
+5. Bulutli fayl saqlash migratsiyasi (S3/Cloudinary)
+6. To'liq test qoplami (Vitest/Jest + RTL)
 
-7. **SSR optimizatsiya** — SEO muhim sahifalarni server-side rendering ga o'tkazish
-8. **PWA** — Offline rejim va mobil ilovaga o'xshash tajriba
-9. **Karyera tizimi** — Backend asosida personallashtirilgan tavsiyalar
-10. **Analytics** — Google Analytics yoki Mixpanel integratsiya
+**3-navbat (1-2 oy)**
+7. Muhim sahifalarga SSR/SEO
+8. Karyera tizimini backendga bog'lash
+9. Monitoring + analytics + CI/CD
 
 ---
 
@@ -730,62 +831,81 @@ FRONTEND_URL=http://localhost:3000
 | Talab | Minimum |
 |-------|---------|
 | Brauzer | Chrome 90+, Firefox 88+, Safari 15+, Edge 90+ |
-| Internet | 1 Mbps (video uchun 5 Mbps) |
+| Internet | 1 Mbps (video/3D uchun 5 Mbps) |
 | Ekran | 320px minimum kenglik (responsive) |
 
 ### 11.2 Server uchun
 
 | Talab | Tavsiya |
 |-------|---------|
-| Node.js | 18+ |
+| Node.js | 20+ (loyiha 25.x da sinovdan o'tgan) |
 | RAM | 1 GB minimum |
 | Disk | 10 GB (media fayllar uchun) |
-| MongoDB | 6.0+ (Atlas M10+ ishlab chiqarish uchun) |
+| MongoDB | Atlas (ishlab chiqarish uchun M10+) |
 
 ---
 
 ## 12. FOYDALANISHNI BOSHLASH
 
-### 12.1 Backend
+### 12.1 Muhit fayllari
 
 ```bash
-cd backend
-npm install
-# .env faylini sozlash
-npm run dev    # Ishlab chiqish
-npm run build  # Kompilyatsiya
-npm start      # Ishlab chiqarish
+# frontend
+cp .env.example .env.local
+
+# backend
+cp backend/.env.example backend/.env
 ```
 
-### 12.2 Frontend
+### 12.2 O'rnatish
 
 ```bash
 npm install
-npm run dev    # http://localhost:3000
-npm run build  # Ishlab chiqarish build
+npm --prefix backend install
 ```
 
-### 12.3 Boshlang'ich ma'lumotlar (Seed)
+### 12.3 Ishlab chiqish (dev)
 
 ```bash
-cd backend
-npx ts-node src/seed.ts
+npm run dev          # Frontend → http://localhost:3000
+npm run dev:backend  # Backend  → http://localhost:5000
+```
+
+### 12.4 Build va ishlab chiqarish
+
+```bash
+npm run build:all    # Frontend + backend build
+npm run start        # Frontend (yoki npm run start:standalone)
+npm run start:backend
+```
+
+### 12.5 Boshlang'ich ma'lumotlar (Seed)
+
+```bash
+npm run seed         # Demo foydalanuvchilar + namunali keyslar
+npm run wipe:cases   # Keys + urinishlarni tozalash
 ```
 
 Yaratiladi:
-- **Admin:** username `admin`, parol `admin123`
-- **Content Manager:** username `manager`, parol `manager123`
-- **Demo User:** username `demouser`, parol `demo123`
-- **6 ta namunali klinik keys** (kardiologiya, pulmonologiya, gastroenterologiya va boshqalar)
+- **Admin:** `admin` / `admin123`
+- **Content Manager:** `manager` / `manager123`
+- **Demo User:** `demouser` / `demo123`
+- Namunali nashr qilingan klinik keyslar (turli kategoriya)
+
+### 12.6 Health check
+
+```
+GET http://localhost:5000/api/health
+```
 
 ---
 
 ## 13. XULOSA
 
-**Med AI Simulator** — O'zbekiston tibbiyot ta'limida zamonaviy texnologiyalarni qo'llashga qaratilgan innovatsion loyiha. Sun'iy intellekt, nutq sintezi va interaktiv simulyatsiya orqali talabalar xavfsiz muhitda amaliy ko'nikmalar orttiradi.
+**Med AI Simulator** — O'zbekiston tibbiyot ta'limida zamonaviy texnologiyalarni qo'llashga qaratilgan innovatsion loyiha. Sun'iy intellekt (baholash + chatbot), o'zbek nutq sintezi, 3D anatomiya simulyatori, tibbiy kutubxona va interaktiv klinik simulyatsiya orqali talabalar xavfsiz muhitda amaliy ko'nikmalar orttiradi.
 
-Loyiha hozirgi holatda MVP (Minimum Viable Product) bosqichida bo'lib, asosiy funksiyalar to'liq ishlamoqda. To'lov integratsiyasi, test qoplami va ishlab chiqarish optimizatsiyalari keyingi bosqichlarda amalga oshiriladi.
+Loyiha MVP'dan keng funksional platformaga o'sgan: asosiy o'quv oqimlari, geymifikatsiya (reyting), o'quv resurslari (kutubxona, kurslar) va obuna tizimi ishlamoqda. Keyingi bosqichdagi asosiy ustuvorliklar — **avtomatik to'lov integratsiyasi**, **test qoplami** va **maxfiy kalitlar xavfsizligi**.
 
 ---
 
-*Hujjat oxiri | Med AI Simulator v1.0 | 2026*
+*Hujjat oxiri | Med AI Simulator | TZ v2.0 | 2026-05-25*

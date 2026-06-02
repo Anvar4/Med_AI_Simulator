@@ -198,7 +198,7 @@ export default function Sidebar() {
 			<motion.aside
 				animate={{ width: collapsed ? 72 : 256 }}
 				transition={{ duration: 0.3, ease: 'easeInOut' }}
-				className='hidden lg:flex flex-col fixed left-0 top-0 h-dvh bg-surface border-r border-border z-40'
+				className='hidden lg:flex flex-col fixed left-0 top-0 h-dvh glass border-r z-40'
 			>
 				<div className='flex items-center justify-center px-4 h-16 border-b border-border overflow-hidden'>
 					{collapsed ? (

@@ -1,50 +1,71 @@
 @import 'tailwindcss';
 
 @theme inline {
-	--color-primary: #00c9a7;
-	--color-primary-dark: #00a38a;
+	--color-primary: var(--primary);
+	--color-primary-dark: var(--primary-dark);
 	--color-secondary: var(--secondary);
-	--color-accent: #ff6b6b;
-	--color-success: #4ecb71;
-	--color-warning: #ffd93d;
+	--color-accent: var(--accent);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
 	--color-surface: var(--surface);
 	--color-surface-light: var(--surface-light);
 	--color-text-primary: var(--text-primary);
 	--color-text-secondary: var(--text-secondary);
 	--color-border: var(--border);
+	--color-brand-green: var(--brand-green);
 	--font-sans: var(--font-sora);
 	--font-body: var(--font-inter);
 }
 
-/* Dark mode (default) */
+/* ─── Dark mode (Nuvica deep-navy glass) ─── */
 :root,
 .dark {
-	--primary: #00c9a7;
-	--primary-dark: #00a38a;
-	--secondary: #1a1f2e;
-	--accent: #ff6b6b;
-	--success: #4ecb71;
-	--warning: #ffd93d;
-	--surface: #242938;
-	--surface-light: #2e3447;
-	--text-primary: #f0f4ff;
-	--text-secondary: #8892a4;
-	--border: rgba(255, 255, 255, 0.08);
+	--primary: #2f80ed;            /* medical blue */
+	--primary-dark: #1f5fd1;
+	--secondary: #0a1424;          /* deep navy page bg */
+	--accent: #f4607a;             /* danger / destructive (kept distinct from green) */
+	--success: #2bd576;            /* Nuvica green accent */
+	--brand-green: #2bd576;
+	--warning: #ffce4d;
+	--surface: #11203a;            /* glass card base */
+	--surface-light: #18294a;
+	--text-primary: #eaf2ff;
+	--text-secondary: #93a4c4;
+	--border: rgba(140, 180, 255, 0.12);
+
+	/* Liquid background mesh stops */
+	--mesh-1: #0a1424;
+	--mesh-2: #123056;
+	--mesh-3: #0d4a4a;
+	--mesh-4: #0a1424;
+	/* Glass surface (translucent) */
+	--glass-bg: rgba(20, 38, 68, 0.55);
+	--glass-border: rgba(150, 190, 255, 0.16);
+	--glass-highlight: rgba(255, 255, 255, 0.06);
 }
 
-/* Light mode */
+/* ─── Light mode (Nuvica airy sky-blue + glass) ─── */
 .light {
-	--primary: #00a38a;
-	--primary-dark: #008c76;
-	--secondary: #f5f7fa;
-	--accent: #e74c3c;
-	--success: #27ae60;
-	--warning: #f39c12;
+	--primary: #2563eb;
+	--primary-dark: #1d4ed8;
+	--secondary: #e9f2fc;          /* soft sky page bg */
+	--accent: #e3506c;             /* danger / destructive */
+	--success: #22c55e;            /* Nuvica green accent */
+	--brand-green: #22c55e;
+	--warning: #f59e0b;
 	--surface: #ffffff;
-	--surface-light: #eef1f6;
-	--text-primary: #1a1f2e;
-	--text-secondary: #5f6b7a;
-	--border: rgba(0, 0, 0, 0.08);
+	--surface-light: #eef5fe;
+	--text-primary: #0f2942;       /* deep navy text */
+	--text-secondary: #5a7596;
+	--border: rgba(37, 99, 235, 0.12);
+
+	--mesh-1: #e9f2fc;
+	--mesh-2: #cfe4fb;
+	--mesh-3: #d9f2e6;
+	--mesh-4: #eaf2fb;
+	--glass-bg: rgba(255, 255, 255, 0.55);
+	--glass-border: rgba(255, 255, 255, 0.7);
+	--glass-highlight: rgba(255, 255, 255, 0.85);
 }
 
 * {
@@ -57,6 +78,28 @@ body {
 	color: var(--text-primary);
 	font-family: var(--font-body), sans-serif;
 	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Subtle living liquid mesh behind everything */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	background:
+		radial-gradient(60% 50% at 15% 10%, var(--mesh-2) 0%, transparent 60%),
+		radial-gradient(55% 45% at 85% 20%, var(--mesh-3) 0%, transparent 55%),
+		radial-gradient(70% 60% at 50% 100%, var(--mesh-2) 0%, transparent 60%),
+		var(--mesh-1);
+	background-size: 200% 200%;
+	animation: liquid-drift 22s ease-in-out infinite;
+	opacity: 0.9;
+}
+
+/* Page wrappers use bg-secondary as a full-bleed layer; make it translucent so
+   the living liquid mesh shows through without touching every page's markup. */
+.bg-secondary {
+	background-color: color-mix(in srgb, var(--secondary) 78%, transparent) !important;
 }
 
 html,
@@ -81,16 +124,45 @@ h6 {
 	font-family: var(--font-sans), sans-serif;
 }
 
+/* ─── Liquid glass utilities ─── */
+.glass {
+	background: var(--glass-bg);
+	backdrop-filter: blur(18px) saturate(140%);
+	-webkit-backdrop-filter: blur(18px) saturate(140%);
+	border: 1px solid var(--glass-border);
+	box-shadow:
+		0 8px 32px rgba(15, 41, 66, 0.12),
+		inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass-soft {
+	background: color-mix(in srgb, var(--surface) 70%, transparent);
+	backdrop-filter: blur(12px) saturate(130%);
+	-webkit-backdrop-filter: blur(12px) saturate(130%);
+	border: 1px solid var(--glass-border);
+}
+
+/* Gradient brand button (blue → green sheen like the reference) */
+.btn-liquid {
+	background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+	box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.accent-green {
+	background: var(--brand-green);
+	color: #053018;
+}
+
+/* ─── Animations ─── */
+@keyframes liquid-drift {
+	0%, 100% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
+	50% { background-position: 100% 100%, 0% 100%, 50% 0%, 0 0; }
+}
+
 @keyframes gradient-mesh {
-	0% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-	100% {
-		background-position: 0% 50%;
-	}
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
 }
 
 @keyframes shimmer {
@@ -99,19 +171,14 @@ h6 {
 }
 
 .animate-gradient-mesh {
-	background: linear-gradient(-45deg, #1a1f2e, #00c9a7, #1a1f2e, #00a38a);
+	background: linear-gradient(-45deg, var(--mesh-1), var(--mesh-2), var(--mesh-3), var(--mesh-4));
 	background-size: 400% 400%;
 	animation: gradient-mesh 15s ease infinite;
 }
 
 @keyframes float {
-	0%,
-	100% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-10px);
-	}
+	0%, 100% { transform: translateY(0px); }
+	50% { transform: translateY(-10px); }
 }
 
 .animate-float {

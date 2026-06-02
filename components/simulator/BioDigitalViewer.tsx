@@ -48,20 +48,21 @@ function ViewerSkeleton() {
 function ViewerError({ onRetry }: { onRetry: () => void }) {
 	return (
 		<div className='absolute inset-0 flex flex-col items-center justify-center bg-surface z-10 p-8'>
-			<div className='max-w-sm w-full text-center'>
+			<div className='max-w-md w-full text-center'>
 				<div className='w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4'>
 					<AlertTriangle className='w-7 h-7 text-accent' />
 				</div>
 				<h3 className='text-base font-semibold text-text-primary mb-2'>Yuklab bo&apos;lmadi</h3>
-				<p className='text-sm text-text-secondary mb-2'>
-					BioDigital API faqat{' '}
-					<code className='text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs'>127.0.0.1</code>{' '}
-					domeni uchun ruxsat berilgan.
+				<p className='text-sm text-text-secondary mb-3'>
+					BioDigital Developer Key joriy domen uchun ruxsat etilmagan yoki{' '}
+					<code className='text-primary bg-primary/10 px-1.5 py-0.5 rounded text-xs'>NEXT_PUBLIC_BIODIGITAL_DK</code>{' '}
+					sozlanmagan.
 				</p>
-				<p className='text-xs text-text-secondary mb-5'>
-					Brauzerda{' '}
-					<strong className='text-text-primary'>http://127.0.0.1:3000/simulator</strong>{' '}
-					orqali oching.
+				<p className='text-xs text-text-secondary mb-5 leading-relaxed'>
+					<strong className='text-text-primary'>developer.biodigital.com</strong> → My Apps →
+					Allowed Domains ro&apos;yxatiga joriy domenni (masalan <code>localhost</code>) qo&apos;shing va kalitni
+					<code className='text-primary bg-primary/10 px-1 py-0.5 rounded mx-1'>.env.local</code>
+					ga yozing.
 				</p>
 				<button onClick={onRetry}
 					className='inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors'>
