@@ -432,6 +432,40 @@ export const api = {
       request<{ status: string; valid: boolean; certificate?: { serial: string; recipientName: string; courseTitle: string; issuedAt: string } }>(
         `/courses/certificates/verify/${encodeURIComponent(serial)}`
       ),
+
+    // ── Course management (CM / admin) ──
+    createCourse: (data: CourseInput) =>
+      request<{ status: string; course: CourseSummary }>('/courses', {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    updateCourse: (id: string, data: Partial<CourseInput & { isPublished: boolean }>) =>
+      request<{ status: string; course: CourseSummary }>(`/courses/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    deleteCourse: (id: string) =>
+      request<{ status: string; message: string }>(`/courses/${id}`, { method: 'DELETE' }),
+
+    createPlaylist: (courseId: string, data: { title: string; description?: string; order?: number }) =>
+      request<{ status: string; playlist: CoursePlaylist }>(`/courses/${courseId}/playlists`, {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    updatePlaylist: (id: string, data: { title?: string; description?: string; order?: number; isPublished?: boolean }) =>
+      request<{ status: string; playlist: CoursePlaylist }>(`/courses/playlists/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    deletePlaylist: (id: string) =>
+      request<{ status: string; message: string }>(`/courses/playlists/${id}`, { method: 'DELETE' }),
+
+    createVideo: (playlistId: string, data: { title: string; url: string; description?: string; durationSeconds?: number; order?: number }) =>
+      request<{ status: string; video: CourseVideo }>(`/courses/playlists/${playlistId}/videos`, {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    updateVideo: (id: string, data: { title?: string; url?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
+      request<{ status: string; video: CourseVideo }>(`/courses/videos/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    deleteVideo: (id: string) =>
+      request<{ status: string; message: string }>(`/courses/videos/${id}`, { method: 'DELETE' }),
   },
 
   // ─── Speech-to-Text (voice input) ──────────────────────────
@@ -508,6 +542,16 @@ export interface LearningPathItem {
 }
 
 export type RecommendedCase = Omit<BackendCase, 'correctDiagnosis' | 'correctTreatment'>
+
+export interface CourseInput {
+  title: string
+  description?: string
+  category?: string
+  author?: string
+  level?: 'beginner' | 'intermediate' | 'advanced'
+  isPremium?: boolean
+  coverImage?: string
+}
 
 export interface CourseSummary {
   _id: string

@@ -5,7 +5,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { AdminCategory, api, BackendCase } from '@/lib/api';
+import { AdminCategory, api, BackendCase, CourseDetail, CourseInput, CourseSummary } from '@/lib/api';
 import { canAccessContentManager, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -805,9 +805,210 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 	)
 }
 
+/* ─── Course management (CM panel) ─── */
+function CourseManager() {
+	const [courses, setCourses] = useState<CourseSummary[]>([])
+	const [loading, setLoading] = useState(false)
+	const [selected, setSelected] = useState<CourseDetail | null>(null)
+	const [showCourseForm, setShowCourseForm] = useState(false)
+	const [courseForm, setCourseForm] = useState<CourseInput>({ title: '', description: '', category: '', level: 'beginner', isPremium: false })
+	const [error, setError] = useState('')
+
+	const loadCourses = useCallback(async () => {
+		setLoading(true)
+		try {
+			const res = await api.courses.list({})
+			setCourses(res.courses)
+		} catch { /* silent */ } finally { setLoading(false) }
+	}, [])
+
+	const openCourse = useCallback(async (slug: string) => {
+		try {
+			const res = await api.courses.get(slug)
+			setSelected(res.course)
+		} catch { /* silent */ }
+	}, [])
+
+	useEffect(() => { loadCourses() }, [loadCourses])
+
+	async function handleCreateCourse(e: React.FormEvent) {
+		e.preventDefault()
+		setError('')
+		if (!courseForm.title.trim()) { setError('Kurs nomi majburiy'); return }
+		try {
+			await api.courses.createCourse(courseForm)
+			setShowCourseForm(false)
+			setCourseForm({ title: '', description: '', category: '', level: 'beginner', isPremium: false })
+			loadCourses()
+		} catch (err) { setError(err instanceof Error ? err.message : 'Xatolik') }
+	}
+
+	async function handleDeleteCourse(id: string) {
+		if (!confirm('Kursni va unga tegishli barcha pleylist/videolarni o\'chirasizmi?')) return
+		try { await api.courses.deleteCourse(id); if (selected?._id === id) setSelected(null); loadCourses() } catch { /* silent */ }
+	}
+
+	// Course detail view (playlists + videos)
+	if (selected) {
+		return <CourseDetailManager course={selected} onBack={() => { setSelected(null); loadCourses() }} onRefresh={() => openCourse(selected.slug)} />
+	}
+
+	return (
+		<motion.div initial='hidden' animate='visible' variants={fadeIn} className='space-y-4'>
+			<div className='flex items-center justify-between'>
+				<h2 className='text-lg font-semibold text-text-primary'>Video kurslar</h2>
+				<Button size='sm' onClick={() => setShowCourseForm(v => !v)}>
+					<Plus className='w-4 h-4' /> Yangi kurs
+				</Button>
+			</div>
+
+			{showCourseForm && (
+				<Card hover={false}>
+					<form onSubmit={handleCreateCourse} className='space-y-3'>
+						<input value={courseForm.title} onChange={e => setCourseForm(f => ({ ...f, title: e.target.value }))}
+							placeholder='Kurs nomi' className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary' />
+						<textarea value={courseForm.description} onChange={e => setCourseForm(f => ({ ...f, description: e.target.value }))}
+							placeholder='Tavsif' rows={2} className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary' />
+						<div className='grid grid-cols-2 gap-3'>
+							<input value={courseForm.category} onChange={e => setCourseForm(f => ({ ...f, category: e.target.value }))}
+								placeholder='Turkum (masalan: Kardiologiya)' className='bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary' />
+							<select value={courseForm.level} onChange={e => setCourseForm(f => ({ ...f, level: e.target.value as CourseInput['level'] }))}
+								className='bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary'>
+								<option value='beginner'>Boshlang&apos;ich</option>
+								<option value='intermediate'>O&apos;rta</option>
+								<option value='advanced'>Yuqori</option>
+							</select>
+						</div>
+						<label className='flex items-center gap-2 text-sm text-text-secondary'>
+							<input type='checkbox' checked={courseForm.isPremium} onChange={e => setCourseForm(f => ({ ...f, isPremium: e.target.checked }))} />
+							Premium kurs
+						</label>
+						{error && <p className='text-sm text-accent'>{error}</p>}
+						<div className='flex gap-2'>
+							<Button size='sm' type='submit'>Yaratish</Button>
+							<Button size='sm' variant='secondary' type='button' onClick={() => setShowCourseForm(false)}>Bekor</Button>
+						</div>
+					</form>
+				</Card>
+			)}
+
+			{loading ? (
+				<p className='text-sm text-text-secondary py-6 text-center'>Yuklanmoqda...</p>
+			) : courses.length === 0 ? (
+				<Card hover={false}><p className='text-sm text-text-secondary py-6 text-center'>Hali kurs yo&apos;q. Birinchi kursni yarating.</p></Card>
+			) : (
+				<div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+					{courses.map(c => (
+						<Card key={c._id} hover={false}>
+							<div className='flex items-start justify-between gap-2'>
+								<button onClick={() => openCourse(c.slug)} className='text-left flex-1'>
+									<p className='text-sm font-semibold text-text-primary'>{c.title}</p>
+									<p className='text-xs text-text-secondary mt-0.5'>{c.category} · {c.videoCount} ta dars{c.isPremium ? ' · Premium' : ''}</p>
+								</button>
+								<button onClick={() => handleDeleteCourse(c._id)} className='p-1.5 rounded-lg text-text-secondary hover:text-accent'>
+									<Trash2 className='w-4 h-4' />
+								</button>
+							</div>
+							<button onClick={() => openCourse(c.slug)} className='mt-2 text-xs text-primary hover:underline'>Pleylist va videolar →</button>
+						</Card>
+					))}
+				</div>
+			)}
+		</motion.div>
+	)
+}
+
+/* ─── Single course: playlists + videos ─── */
+function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDetail; onBack: () => void; onRefresh: () => void }) {
+	const [newPlaylist, setNewPlaylist] = useState('')
+	const [videoForms, setVideoForms] = useState<Record<string, { title: string; url: string }>>({})
+
+	async function addPlaylist() {
+		if (!newPlaylist.trim()) return
+		try { await api.courses.createPlaylist(course._id, { title: newPlaylist.trim() }); setNewPlaylist(''); onRefresh() } catch { /* silent */ }
+	}
+	async function delPlaylist(id: string) {
+		if (!confirm('Pleylist va undagi videolarni o\'chirasizmi?')) return
+		try { await api.courses.deletePlaylist(id); onRefresh() } catch { /* silent */ }
+	}
+	async function addVideo(playlistId: string) {
+		const f = videoForms[playlistId]
+		if (!f?.title?.trim() || !f?.url?.trim()) return
+		try {
+			await api.courses.createVideo(playlistId, { title: f.title.trim(), url: f.url.trim() })
+			setVideoForms(s => ({ ...s, [playlistId]: { title: '', url: '' } }))
+			onRefresh()
+		} catch { /* silent */ }
+	}
+	async function delVideo(id: string) {
+		try { await api.courses.deleteVideo(id); onRefresh() } catch { /* silent */ }
+	}
+
+	const setVF = (pid: string, key: 'title' | 'url', val: string) =>
+		setVideoForms(s => {
+			const cur = s[pid] ?? { title: '', url: '' }
+			return { ...s, [pid]: { ...cur, [key]: val } }
+		})
+
+	return (
+		<motion.div initial='hidden' animate='visible' variants={fadeIn} className='space-y-4'>
+			<button onClick={onBack} className='text-sm text-primary hover:underline'>← Kurslarga qaytish</button>
+			<div>
+				<h2 className='text-lg font-semibold text-text-primary'>{course.title}</h2>
+				<p className='text-xs text-text-secondary'>{course.category} · {course.level}{course.isPremium ? ' · Premium' : ''}</p>
+			</div>
+
+			{/* Add playlist */}
+			<div className='flex gap-2'>
+				<input value={newPlaylist} onChange={e => setNewPlaylist(e.target.value)} placeholder='Yangi pleylist (modul) nomi'
+					className='flex-1 bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary' />
+				<Button size='sm' onClick={addPlaylist}><Plus className='w-4 h-4' /> Pleylist</Button>
+			</div>
+
+			{course.playlists.length === 0 ? (
+				<Card hover={false}><p className='text-sm text-text-secondary py-4 text-center'>Pleylist yo&apos;q. Birinchi modulni qo&apos;shing.</p></Card>
+			) : (
+				course.playlists.map(pl => (
+					<Card key={pl._id} hover={false}>
+						<div className='flex items-center justify-between mb-3'>
+							<h3 className='text-sm font-bold text-text-primary'>{pl.title}</h3>
+							<button onClick={() => delPlaylist(pl._id)} className='p-1.5 rounded-lg text-text-secondary hover:text-accent'>
+								<Trash2 className='w-4 h-4' />
+							</button>
+						</div>
+
+						<ul className='space-y-1 mb-3'>
+							{pl.videos.map((v, i) => (
+								<li key={v._id} className='flex items-center gap-2 text-sm text-text-secondary'>
+									<span className='w-5 text-xs'>{i + 1}</span>
+									<span className='flex-1 line-clamp-1'>{v.title}</span>
+									<button onClick={() => delVideo(v._id)} className='p-1 rounded text-text-secondary hover:text-accent'>
+										<Trash2 className='w-3.5 h-3.5' />
+									</button>
+								</li>
+							))}
+							{pl.videos.length === 0 && <li className='text-xs text-text-secondary/60'>Hali video yo&apos;q</li>}
+						</ul>
+
+						{/* Add video */}
+						<div className='flex flex-col sm:flex-row gap-2'>
+							<input value={videoForms[pl._id]?.title ?? ''} onChange={e => setVF(pl._id, 'title', e.target.value)}
+								placeholder='Video sarlavhasi' className='flex-1 bg-surface-light border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary' />
+							<input value={videoForms[pl._id]?.url ?? ''} onChange={e => setVF(pl._id, 'url', e.target.value)}
+								placeholder='YouTube havola' className='flex-1 bg-surface-light border border-border rounded-lg px-3 py-1.5 text-sm text-text-primary' />
+							<Button size='sm' onClick={() => addVideo(pl._id)}><Plus className='w-4 h-4' /> Video</Button>
+						</div>
+					</Card>
+				))
+			)}
+		</motion.div>
+	)
+}
+
 export default function ContentManagerPage() {
 	const { user, isLoading } = useAuth()
 	const router = useRouter()
+	const [cmTab, setCmTab] = useState<'cases' | 'courses'>('cases')
 	const [cases, setCases] = useState<BackendCase[]>([])
 	const [total, setTotal] = useState(0)
 	const [casesLoading, setCasesLoading] = useState(false)
@@ -928,8 +1129,28 @@ export default function ContentManagerPage() {
 							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>Kontent Boshqaruvi</h1>
 							<Badge variant='warning'>Menejer</Badge>
 						</div>
-						<p className='text-text-secondary'>Klinik holatlar yaratish, tahrirlash va boshqarish</p>
+						<p className='text-text-secondary'>Klinik holatlar va video kurslar yaratish, tahrirlash va boshqarish</p>
 					</motion.div>
+
+					{/* Tab switcher */}
+					<div className='flex gap-2 mb-6'>
+						<button
+							onClick={() => setCmTab('cases')}
+							className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cmTab === 'cases' ? 'bg-primary text-secondary' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
+						>
+							Klinik holatlar
+						</button>
+						<button
+							onClick={() => setCmTab('courses')}
+							className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cmTab === 'courses' ? 'bg-primary text-secondary' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
+						>
+							Video kurslar
+						</button>
+					</div>
+
+					{cmTab === 'courses' && <CourseManager />}
+
+					{cmTab === 'cases' && <>
 
 					{/* Stats */}
 					<motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
@@ -1089,6 +1310,8 @@ export default function ContentManagerPage() {
 							)}
 						</Card>
 					</motion.div>
+
+					</>}
 				</div>
 			</main>
 
