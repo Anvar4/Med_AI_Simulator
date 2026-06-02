@@ -261,13 +261,21 @@ export const deleteCase = async (req: AuthRequest, res: Response): Promise<void>
   try {
     const id = req.params.id as string
     const filter = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { caseId: id }
-    const deleted = await Case.findOneAndDelete(filter)
 
-    if (!deleted) {
+    const existing = await Case.findOne(filter)
+    if (!existing) {
       res.status(404).json({ message: 'Keys topilmadi' })
       return
     }
 
+    // Admins may delete any case; instructors may only delete their own.
+    const isAdmin = req.user!.role === 'admin'
+    if (!isAdmin && existing.createdBy?.toString() !== req.user!._id.toString()) {
+      res.status(403).json({ message: 'Bu klinik holatni o\'chirish huquqiga ega emassiz' })
+      return
+    }
+
+    await existing.deleteOne()
     res.json({ status: 'success', message: 'Keys o\'chirildi' })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })

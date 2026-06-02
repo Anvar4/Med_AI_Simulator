@@ -4,7 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { AdminCategory, AdminStats, api, BackendUser, PromoCode } from '@/lib/api';
+import { AdminCategory, AdminStats, api, BackendCase, BackendUser, PaymentRequestRow, PromoCode } from '@/lib/api';
 import { canAccessAdmin, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -37,7 +37,7 @@ const fadeIn = {
 	visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 }
 
-type Tab = 'dashboard' | 'users' | 'promo' | 'categories'
+type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review'
 
 /* ─── Create/Edit User Modal ─── */
 interface UserModalProps {
@@ -288,6 +288,15 @@ export default function AdminPage() {
 	const [recentUsers, setRecentUsers] = useState<BackendUser[]>([])
 	const [statsLoading, setStatsLoading] = useState(false)
 
+	// Payments state
+	const [payments, setPayments] = useState<PaymentRequestRow[]>([])
+	const [paymentsLoading, setPaymentsLoading] = useState(false)
+	const [paymentStatusFilter, setPaymentStatusFilter] = useState('pending')
+
+	// Review queue state (cases submitted for review)
+	const [reviewCases, setReviewCases] = useState<BackendCase[]>([])
+	const [reviewLoading, setReviewLoading] = useState(false)
+
 	// Users state
 	const [users, setUsers] = useState<BackendUser[]>([])
 	const [userTotal, setUserTotal] = useState(0)
@@ -385,10 +394,47 @@ export default function AdminPage() {
 		}
 	}, [])
 
+	const loadPayments = useCallback(async (status: string) => {
+		setPaymentsLoading(true)
+		try {
+			const res = await api.admin.getPayments({ status: status || undefined })
+			setPayments(res.requests)
+		} catch {
+			// silent
+		} finally {
+			setPaymentsLoading(false)
+		}
+	}, [])
+
 	useEffect(() => { if (tab === 'dashboard') loadDashboard() }, [tab, loadDashboard])
 	useEffect(() => { if (tab === 'users') loadUsers(userPage, userSearch, userRole) }, [tab, userPage, userRole, loadUsers, userSearch])
 	useEffect(() => { if (tab === 'promo') loadPromoCodes(promoPage, promoTypeFilter) }, [tab, promoPage, promoTypeFilter, loadPromoCodes])
 	useEffect(() => { if (tab === 'categories') loadCategories() }, [tab, loadCategories])
+	useEffect(() => { if (tab === 'payments') loadPayments(paymentStatusFilter) }, [tab, paymentStatusFilter, loadPayments])
+
+	const loadReview = useCallback(async () => {
+		setReviewLoading(true)
+		try {
+			const res = await api.cases.getAll({ status: 'review', limit: 50 })
+			setReviewCases(res.cases)
+		} catch {
+			// silent
+		} finally {
+			setReviewLoading(false)
+		}
+	}, [])
+
+	useEffect(() => { if (tab === 'review') loadReview() }, [tab, loadReview])
+
+	async function handleConfirmPayment(id: string) {
+		try { await api.admin.confirmPayment(id); loadPayments(paymentStatusFilter) } catch { /* silent */ }
+	}
+	async function handleRejectPayment(id: string) {
+		try { await api.admin.rejectPayment(id); loadPayments(paymentStatusFilter) } catch { /* silent */ }
+	}
+	async function handleReviewDecision(id: string, decision: 'published' | 'rejected') {
+		try { await api.cases.update(id, { status: decision }); loadReview() } catch { /* silent */ }
+	}
 
 	function handleSearchChange(v: string) {
 		setUserSearch(v)
@@ -425,6 +471,8 @@ export default function AdminPage() {
 	const tabs = [
 		{ id: 'dashboard' as Tab, label: 'Boshqaruv' },
 		{ id: 'users' as Tab, label: 'Foydalanuvchilar' },
+		{ id: 'review' as Tab, label: 'Tekshiruv' },
+		{ id: 'payments' as Tab, label: 'To\'lovlar' },
 		{ id: 'categories' as Tab, label: 'Turkumlar' },
 		{ id: 'promo' as Tab, label: 'Promo kodlar' },
 	]
@@ -675,6 +723,104 @@ export default function AdminPage() {
 									</div>
 								)}
 							</AnimatePresence>
+						</motion.div>
+					)}
+
+					{/* ── Review Queue Tab ── */}
+					{tab === 'review' && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn} className='space-y-4'>
+							<Card hover={false}>
+								<div className='flex items-center gap-2 mb-4'>
+									<BookOpen className='w-5 h-5 text-primary' />
+									<h3 className='text-lg font-semibold text-text-primary'>Tekshiruvga yuborilgan klinik holatlar</h3>
+									<span className='ml-auto text-sm text-text-secondary'>{reviewCases.length} ta</span>
+								</div>
+
+								{reviewLoading ? (
+									<p className='text-sm text-text-secondary py-6 text-center'>Yuklanmoqda...</p>
+								) : reviewCases.length === 0 ? (
+									<p className='text-sm text-text-secondary py-6 text-center'>Tekshiruvga yuborilgan holatlar yo&apos;q.</p>
+								) : (
+									<div className='space-y-2'>
+										{reviewCases.map(c => (
+											<div key={c._id} className='flex flex-wrap items-center gap-3 p-3 rounded-xl border border-border bg-surface-light'>
+												<div className='flex-1 min-w-45'>
+													<p className='text-sm font-semibold text-text-primary'>{c.title}</p>
+													<p className='text-xs text-text-secondary'>{c.category} · {c.authorName} · {'★'.repeat(Math.min(5, c.difficulty))}</p>
+												</div>
+												<div className='flex gap-2'>
+													<Button size='sm' onClick={() => handleReviewDecision(c._id, 'published')}>
+														<Check className='w-3.5 h-3.5' /> Chop etish
+													</Button>
+													<Button size='sm' variant='secondary' className='bg-accent! hover:bg-accent/90! text-white!' onClick={() => handleReviewDecision(c._id, 'rejected')}>
+														<X className='w-3.5 h-3.5' /> Rad etish
+													</Button>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</Card>
+						</motion.div>
+					)}
+
+					{/* ── Payments Tab ── */}
+					{tab === 'payments' && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn} className='space-y-4'>
+							<Card hover={false}>
+								<div className='flex flex-wrap items-center gap-3 mb-4'>
+									<Crown className='w-5 h-5 text-primary' />
+									<h3 className='text-lg font-semibold text-text-primary'>To&apos;lov so&apos;rovlari</h3>
+									<select
+										value={paymentStatusFilter}
+										onChange={e => setPaymentStatusFilter(e.target.value)}
+										className='ml-auto bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary'
+									>
+										<option value='pending'>Kutilmoqda</option>
+										<option value='paid'>To&apos;langan</option>
+										<option value='cancelled'>Bekor qilingan</option>
+										<option value=''>Barchasi</option>
+									</select>
+								</div>
+
+								{paymentsLoading ? (
+									<p className='text-sm text-text-secondary py-6 text-center'>Yuklanmoqda...</p>
+								) : payments.length === 0 ? (
+									<p className='text-sm text-text-secondary py-6 text-center'>To&apos;lov so&apos;rovlari yo&apos;q.</p>
+								) : (
+									<div className='space-y-2'>
+										{payments.map(p => {
+											const u = typeof p.user === 'string' ? null : p.user
+											return (
+												<div key={p._id} className='flex flex-wrap items-center gap-3 p-3 rounded-xl border border-border bg-surface-light'>
+													<div className='flex-1 min-w-40'>
+														<p className='text-sm font-semibold text-text-primary'>{u?.name || 'Foydalanuvchi'}</p>
+														<p className='text-xs text-text-secondary'>{u?.email}</p>
+													</div>
+													<div className='text-sm'>
+														<span className='font-semibold text-text-primary uppercase'>{p.plan}</span>
+														<span className='text-text-secondary'> · {p.period === 'yearly' ? '1 yil' : '1 oy'}</span>
+													</div>
+													<div className='text-sm font-bold text-primary'>{p.amount.toLocaleString()} {p.currency}</div>
+													<Badge variant={p.status === 'paid' ? 'success' : p.status === 'pending' ? 'warning' : 'danger'}>
+														{p.status === 'paid' ? 'To\'langan' : p.status === 'pending' ? 'Kutilmoqda' : p.status}
+													</Badge>
+													{p.status === 'pending' && (
+														<div className='flex gap-2'>
+															<Button size='sm' onClick={() => handleConfirmPayment(p._id)}>
+																<Check className='w-3.5 h-3.5' /> Tasdiqlash
+															</Button>
+															<Button size='sm' variant='secondary' onClick={() => handleRejectPayment(p._id)}>
+																<X className='w-3.5 h-3.5' /> Rad etish
+															</Button>
+														</div>
+													)}
+												</div>
+											)
+										})}
+									</div>
+								)}
+							</Card>
 						</motion.div>
 					)}
 

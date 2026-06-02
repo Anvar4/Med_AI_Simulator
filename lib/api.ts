@@ -254,6 +254,29 @@ export const api = {
 
     getAnalytics: () =>
       request<{ status: string; analytics: AdminAnalytics }>('/admin/analytics'),
+
+    // Payment requests (manual confirmation)
+    getPayments: (params?: { status?: string; page?: number }) => {
+      const qs = new URLSearchParams()
+      if (params?.status) qs.set('status', params.status)
+      if (params?.page) qs.set('page', String(params.page))
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      return request<{ status: string; total: number; totalPages: number; requests: PaymentRequestRow[] }>(
+        `/admin/payments${suffix}`
+      )
+    },
+
+    confirmPayment: (id: string, note?: string) =>
+      request<{ status: string; message: string }>(`/admin/payments/${id}/confirm`, {
+        method: 'POST',
+        body: JSON.stringify({ note }),
+      }),
+
+    rejectPayment: (id: string, note?: string) =>
+      request<{ status: string; message: string }>(`/admin/payments/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ note }),
+      }),
   },
 
   // ─── Subscriptions API ────────────────────────────────────────
@@ -458,6 +481,21 @@ export const api = {
 }
 
 // ─── Types ────────────────────────────────────────────────────
+
+export interface PaymentRequestRow {
+  _id: string
+  user: { _id: string; name: string; email: string; username?: string } | string
+  plan: 'pro' | 'clinic' | 'university'
+  period: 'monthly' | 'yearly'
+  amount: number
+  originalAmount: number
+  discountPercent: number
+  currency: string
+  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'refunded'
+  provider: 'manual' | 'click' | 'payme'
+  createdAt: string
+  paidAt?: string
+}
 
 export interface LearningPathItem {
   category: string

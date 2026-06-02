@@ -26,7 +26,8 @@ router.get('/:id', optionalAuth, getCaseById)
 // Protected routes
 router.post('/', protect, restrictTo('admin', 'instructor'), createCase)
 router.patch('/:id', protect, restrictTo('admin', 'instructor'), updateCase)
-// Deletion is admin-only per spec (ownership-based edit stays with instructors).
-router.delete('/:id', protect, restrictTo('admin'), deleteCase)
+// Deletion: admins delete any case; instructors delete only their own
+// (ownership enforced inside deleteCase).
+router.delete('/:id', protect, restrictTo('admin', 'instructor'), deleteCase)
 
 export default router

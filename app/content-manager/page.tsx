@@ -113,6 +113,8 @@ const emptyForm = (): CaseFormData => ({
 
 /* ─── Case Form Modal ─── */
 function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: BackendCase | null; onClose: () => void; onSave: () => void; adminCategories: AdminCategory[] }) {
+	const { user } = useAuth()
+	const isAdmin = user?.role === 'admin'
 	const [form, setForm] = useState<CaseFormData>(() => {
 		if (!editCase) return emptyForm()
 
@@ -445,9 +447,13 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 							<select value={form.status} onChange={e => set('status', e.target.value)}
 								className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50'>
 								<option value='draft'>Qoralama</option>
-								<option value='review'>Tekshiruvda</option>
-								<option value='published'>Chop etilgan</option>
+								<option value='review'>{isAdmin ? 'Tekshiruvda' : 'Tekshiruvga yuborish'}</option>
+								{/* Faqat admin to'g'ridan-to'g'ri chop eta oladi */}
+								{isAdmin && <option value='published'>Chop etilgan</option>}
 							</select>
+							{!isAdmin && (
+								<p className='text-[11px] text-text-secondary/70 mt-1'>Klinik holat admin tasdig&apos;idan keyin chop etiladi.</p>
+							)}
 						</div>
 						<div className='flex items-end'>
 							<label className='flex items-center gap-2 cursor-pointer pb-2'>
