@@ -23,6 +23,16 @@ export const startAttempt = async (req: AuthRequest, res: Response): Promise<voi
       return
     }
 
+    // Premium gating: only premium users (or staff) may start premium cases.
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'instructor'
+    if (caseData.isPremium && !req.user!.isPremium && !isStaff) {
+      res.status(403).json({
+        message: 'Bu premium klinik holat. Davom etish uchun Pro obunani faollashtiring.',
+        premiumRequired: true,
+      })
+      return
+    }
+
     // Check if user already has an in-progress attempt
     const existing = await CaseAttempt.findOne({
       user: req.user!._id,

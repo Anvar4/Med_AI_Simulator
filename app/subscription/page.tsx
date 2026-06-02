@@ -70,15 +70,14 @@ export default function SubscriptionPage() {
 		setSubscribing(true)
 		try {
 			const res = await api.subscriptions.subscribe(selectedPlan.id, billingPeriod)
-			updateUser({ isPremium: true, subscription: res.subscription, discount: null })
+			// Subscribing creates a pending payment request; premium is granted only
+			// after the payment is confirmed. Do NOT mark the user premium here.
 			setSubMsg({ type: 'success', text: res.message })
-			// Refresh referral info (referrer may have gotten 10% discount)
-			api.subscriptions.getReferralInfo().then(data => setReferralInfo(data)).catch(() => {})
 			setTimeout(() => {
 				setSelectedPlan(null)
 				setSubMsg(null)
 				setDiscountApplied(false)
-			}, 3000)
+			}, 6000)
 		} catch (err) {
 			setSubMsg({ type: 'error', text: err instanceof Error ? err.message : 'Xatolik yuz berdi' })
 		} finally {

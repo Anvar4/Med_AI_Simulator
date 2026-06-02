@@ -1,5 +1,11 @@
 export { Case } from './Case'
 export { CaseAttempt } from './CaseAttempt'
 export { Category } from './Category'
+export { Certificate } from './Certificate'
+export { Course } from './Course'
+export { PaymentRequest } from './PaymentRequest'
+export { Playlist } from './Playlist'
 export { User } from './User'
+export { Video } from './Video'
+export { VideoProgress } from './VideoProgress'
 

@@ -7,7 +7,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "tsx --test src/**/*.test.ts",
     "seed": "tsx src/seed.ts",
+    "seed:courses": "tsx src/seedCourses.ts",
     "wipe:cases": "tsx src/wipeCases.ts"
   },
   "dependencies": {

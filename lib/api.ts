@@ -271,7 +271,7 @@ export const api = {
       }),
 
     subscribe: (planId: string, period: 'monthly' | 'yearly') =>
-      request<{ status: string; message: string; subscription: UserSubscription; expiresAt: string; price: number; originalPrice: number; discountPercent: number }>('/subscriptions/subscribe', {
+      request<{ status: string; message: string; paymentRequestId: string; price: number; originalPrice: number; discountPercent: number }>('/subscriptions/subscribe', {
         method: 'POST',
         body: JSON.stringify({ planId, period }),
       }),
@@ -375,9 +375,90 @@ export const api = {
         body: JSON.stringify({ messages }),
       }),
   },
+
+  // ─── Courses (DB-driven video courses) ──────────────────────
+  courses: {
+    list: (params: { category?: string; search?: string; level?: string; page?: number } = {}) => {
+      const qs = new URLSearchParams()
+      if (params.category) qs.set('category', params.category)
+      if (params.search) qs.set('search', params.search)
+      if (params.level) qs.set('level', params.level)
+      if (params.page) qs.set('page', String(params.page))
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      return request<{ status: string; total: number; totalPages: number; currentPage: number; courses: CourseSummary[] }>(
+        `/courses${suffix}`
+      )
+    },
+
+    categories: () =>
+      request<{ status: string; categories: { name: string; count: number }[] }>('/courses/categories'),
+
+    get: (idOrSlug: string) =>
+      request<{ status: string; course: CourseDetail }>(`/courses/${encodeURIComponent(idOrSlug)}`),
+
+    saveProgress: (videoId: string, positionSeconds: number, completed?: boolean) =>
+      request<{ status: string; progress: unknown; certificate: CourseCertificate | null }>(
+        `/courses/videos/${videoId}/progress`,
+        { method: 'POST', body: JSON.stringify({ positionSeconds, completed }) }
+      ),
+
+    myCertificates: () =>
+      request<{ status: string; certificates: CourseCertificate[] }>('/courses/certificates/my'),
+
+    verifyCertificate: (serial: string) =>
+      request<{ status: string; valid: boolean; certificate?: { serial: string; recipientName: string; courseTitle: string; issuedAt: string } }>(
+        `/courses/certificates/verify/${encodeURIComponent(serial)}`
+      ),
+  },
 }
 
 // ─── Types ────────────────────────────────────────────────────
+
+export interface CourseSummary {
+  _id: string
+  title: string
+  slug: string
+  description: string
+  category: string
+  author: string
+  coverImage?: string
+  level: 'beginner' | 'intermediate' | 'advanced'
+  isPremium: boolean
+  videoCount: number
+}
+
+export interface CourseVideo {
+  _id: string
+  title: string
+  description: string
+  youtubeId: string
+  durationSeconds: number
+  order: number
+  completed?: boolean
+}
+
+export interface CoursePlaylist {
+  _id: string
+  title: string
+  description: string
+  order: number
+  videos: CourseVideo[]
+}
+
+export interface CourseDetail extends CourseSummary {
+  locked?: boolean
+  playlists: CoursePlaylist[]
+  progress: { totalVideos: number; completedVideos: number; percent: number }
+}
+
+export interface CourseCertificate {
+  _id?: string
+  serial: string
+  recipientName: string
+  courseTitle: string
+  issuedAt: string
+  course?: { _id: string; title: string; slug: string } | string
+}
 
 export interface UserSubscription {
   plan: 'free' | 'pro' | 'clinic' | 'university'

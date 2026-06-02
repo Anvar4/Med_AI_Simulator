@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+    confirmPaymentRequest,
     createCategory,
     createUser,
     deleteCategory,
@@ -8,11 +9,13 @@ import {
     generatePromoCodes,
     getAdminAnalytics,
     getCategories,
+    getPaymentRequests,
     getPromoCodes,
     getRecentActivity,
     getSystemStats,
     getUserById,
     getUsers,
+    rejectPaymentRequest,
     updateCategory,
     updateUser,
 } from '../controllers/adminController'
@@ -46,5 +49,10 @@ router.delete('/categories/:id', deleteCategory)
 router.post('/promo-codes', generatePromoCodes)
 router.get('/promo-codes', getPromoCodes)
 router.get('/promo-codes/export', exportPromoCodes)
+
+// Payment requests (manual confirmation until gateway is wired in)
+router.get('/payments', getPaymentRequests)
+router.post('/payments/:id/confirm', confirmPaymentRequest)
+router.post('/payments/:id/reject', rejectPaymentRequest)
 
 export default router

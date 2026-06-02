@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import { PaymentRequest } from '../models/PaymentRequest';
 import { PromoCode } from '../models/PromoCode';
 import { User } from '../models/User';
 
@@ -172,44 +173,84 @@ export const subscribe = async (req: AuthRequest, res: Response): Promise<void> 
     const discountPercent = activeDiscount?.percent ?? 0
     const finalPrice = discountPercent > 0 ? Math.round(price * (1 - discountPercent / 100)) : price
 
-    // Calculate expiration date
-    const expiresAt = new Date()
-    if (period === 'yearly') {
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1)
-    } else {
-      expiresAt.setMonth(expiresAt.getMonth() + 1)
+    // SECURITY: subscribing does NOT grant premium directly. A payment request is
+    // created in `pending` state and the subscription is only activated once the
+    // payment is confirmed (manually by an admin today, or by a Click/Payme webhook
+    // later). This closes the "free premium" hole where any user could call
+    // /subscribe and get a paid plan for free.
+    const existingPending = await PaymentRequest.findOne({
+      user: userId,
+      plan: planId,
+      status: 'pending',
+    })
+    if (existingPending) {
+      res.status(400).json({
+        message: 'Bu reja uchun to\'lov so\'rovingiz allaqachon ko\'rib chiqilmoqda',
+        paymentRequestId: existingPending._id,
+      })
+      return
     }
 
-    await User.findByIdAndUpdate(userId, {
-      isPremium: true,
-      'subscription.plan': planId,
-      'subscription.status': 'active',
-      'subscription.expiresAt': expiresAt,
+    const paymentRequest = await PaymentRequest.create({
+      user: userId,
+      plan: planId,
+      period,
+      amount: finalPrice,
+      originalAmount: price,
+      discountPercent,
+      currency: 'UZS',
+      status: 'pending',
+      provider: 'manual',
     })
 
-    // Reward referrer with 10% discount when referred user buys premium
-    if (user.referredBy) {
-      const discountExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-      await User.findByIdAndUpdate(user.referredBy, {
-        discount: { percent: 10, expiresAt: discountExpiresAt },
-      })
-    }
-
-    const updatedUser = await User.findById(userId).select('-password')
-
-    res.json({
-      status: 'success',
-      message: `${planId === 'pro' ? 'Pro' : 'Klinika'} obuna ${period === 'yearly' ? '1 yilga' : '1 oyga'} muvaffaqiyatli faollashtirildi!${
-        discountPercent > 0 ? ` (${discountPercent}% chegirma qo'llanildi)` : ''
-      }`,
-      subscription: updatedUser?.subscription,
-      expiresAt,
+    res.status(201).json({
+      status: 'pending',
+      message: `To'lov so'rovi qabul qilindi. ${planId === 'pro' ? 'Pro' : 'Klinika'} (${
+        period === 'yearly' ? '1 yil' : '1 oy'
+      }) obunasi to'lov tasdiqlangandan so'ng faollashtiriladi.`,
+      paymentRequestId: paymentRequest._id,
       price: finalPrice,
       originalPrice: price,
       discountPercent,
     })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+/**
+ * Activate a subscription from a paid/confirmed payment request.
+ * Shared by the admin manual-confirm flow and (future) gateway webhooks.
+ */
+export async function activateSubscriptionFromPayment(paymentRequestId: string): Promise<void> {
+  const pr = await PaymentRequest.findById(paymentRequestId)
+  if (!pr || pr.status === 'pending' || pr.status === 'failed' || pr.status === 'cancelled') {
+    throw new Error('To\'lov tasdiqlanmagan')
+  }
+
+  const user = await User.findById(pr.user)
+  if (!user) throw new Error('Foydalanuvchi topilmadi')
+
+  const expiresAt = new Date()
+  if (pr.period === 'yearly') {
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+  } else {
+    expiresAt.setMonth(expiresAt.getMonth() + 1)
+  }
+
+  await User.findByIdAndUpdate(pr.user, {
+    isPremium: true,
+    'subscription.plan': pr.plan,
+    'subscription.status': 'active',
+    'subscription.expiresAt': expiresAt,
+  })
+
+  // Reward referrer with a 10% discount, but only after a real, confirmed payment.
+  if (user.referredBy) {
+    const discountExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    await User.findByIdAndUpdate(user.referredBy, {
+      discount: { percent: 10, expiresAt: discountExpiresAt },
+    })
   }
 }
 

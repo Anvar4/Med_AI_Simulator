@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { Case } from '../models/Case';
 import { Category } from '../models/Category';
+import { escapeRegex, resolveCaseStatus, stripProtectedFields } from './caseSecurity';
 
 const INSTRUMENTAL_TESTS = ['ekg', 'uzi', 'rentgen', 'kt', 'mrt', 'endoskopiya'] as const
 const LABORATORY_TESTS = ['qon_analiz', 'siydik_analiz', 'bioximik'] as const
@@ -45,7 +46,7 @@ export const getAllCases = async (req: Request, res: Response): Promise<void> =>
       filter.difficulty = Number(difficulty)
     }
     if (search) {
-      filter.title = { $regex: search as string, $options: 'i' }
+      filter.title = { $regex: escapeRegex(search as string), $options: 'i' }
     }
     if (status) {
       filter.status = status as string
@@ -80,7 +81,7 @@ export const getAllCases = async (req: Request, res: Response): Promise<void> =>
   }
 }
 
-export const getCaseById = async (req: Request, res: Response): Promise<void> => {
+export const getCaseById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string
     // Support both MongoDB _id and custom caseId
@@ -93,8 +94,31 @@ export const getCaseById = async (req: Request, res: Response): Promise<void> =>
       return
     }
 
-    // Premium case check - if user not premium, hide some data
-    const responseCase = caseData.toObject()
+    const responseCase = caseData.toObject() as unknown as Record<string, unknown>
+
+    const user = req.user
+    const isStaff = user?.role === 'admin' || user?.role === 'instructor'
+
+    // SECURITY: never expose the correct answers when serving a case for solving.
+    // Staff (admin/instructor) may see them for editing/review; everyone else
+    // only gets them back through the attempt-submit evaluation result.
+    if (!isStaff) {
+      delete responseCase.correctDiagnosis
+      delete responseCase.correctTreatment
+    }
+
+    // Premium gating: non-premium, non-staff users get a locked preview of
+    // premium cases (no media / labs / patient detail) so they can't bypass
+    // the paywall by hitting the API directly.
+    const isPremiumUser = !!user?.isPremium
+    if (caseData.isPremium && !isPremiumUser && !isStaff) {
+      responseCase.locked = true
+      delete responseCase.mediaItems
+      delete responseCase.labResults
+      delete responseCase.bloodTest
+      delete responseCase.biochemTest
+      delete responseCase.urineTest
+    }
 
     res.json({
       status: 'success',
@@ -144,12 +168,21 @@ export const createCase = async (req: AuthRequest, res: Response): Promise<void>
     const instrumentalTests = sanitizeEnumList(req.body.instrumentalTests, INSTRUMENTAL_TESTS)
     const laboratoryTests = sanitizeEnumList(req.body.laboratoryTests, LABORATORY_TESTS)
 
+    const payload: Record<string, unknown> = { ...req.body }
+    stripProtectedFields(payload)
+
+    // Status is server-controlled. Only admins may publish directly; instructors
+    // may only create drafts or submit for review (draft -> review workflow).
+    const isAdmin = req.user!.role === 'admin'
+    const status = resolveCaseStatus(isAdmin, req.body.status, 'published')
+
     const caseData = {
-      ...req.body,
+      ...payload,
       createdBy: req.user!._id,
       authorName,
       instrumentalTests,
       laboratoryTests,
+      status,
     }
 
     const newCase = await Case.create(caseData)
@@ -165,16 +198,30 @@ export const createCase = async (req: AuthRequest, res: Response): Promise<void>
 
 export const updateCase = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const id = req.params.id as string
+    const filter = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { caseId: id }
+
+    const existing = await Case.findOne(filter)
+    if (!existing) {
+      res.status(404).json({ message: 'Keys topilmadi' })
+      return
+    }
+
+    const isAdmin = req.user!.role === 'admin'
+
+    // Ownership check: instructors may only edit cases they created.
+    if (!isAdmin && existing.createdBy?.toString() !== req.user!._id.toString()) {
+      res.status(403).json({ message: 'Bu klinik holatni tahrirlash huquqiga ega emassiz' })
+      return
+    }
+
     const payload: Record<string, unknown> = { ...req.body }
+    // Strip fields that must never be set directly by the client.
+    stripProtectedFields(payload)
 
     if (Array.isArray(payload.mediaItems) && payload.mediaItems.length === 0) {
       res.status(400).json({ message: 'Klinik holatda media bo\'limi bo\'sh bo\'lishi mumkin emas' })
       return
-    }
-
-    if ('authorName' in payload) {
-      const incoming = typeof payload.authorName === 'string' ? payload.authorName.trim() : ''
-      payload.authorName = incoming || (req.user?.name || '').trim()
     }
 
     if ('instrumentalTests' in payload) {
@@ -185,19 +232,24 @@ export const updateCase = async (req: AuthRequest, res: Response): Promise<void>
       payload.laboratoryTests = sanitizeEnumList(payload.laboratoryTests, LABORATORY_TESTS)
     }
 
-    const id = req.params.id as string
-    const filter = /^[0-9a-fA-F]{24}$/.test(id) ? { _id: id } : { caseId: id }
+    // Status transitions: only admins may move to/keep `published` or `rejected`.
+    // Instructors are limited to draft <-> review on their own cases. When no
+    // valid/permitted status is requested, the existing status is preserved.
+    if (typeof req.body.status === 'string') {
+      if (isAdmin) {
+        if (['draft', 'review', 'published', 'rejected'].includes(req.body.status)) {
+          payload.status = req.body.status
+        }
+      } else if (req.body.status === 'review' || req.body.status === 'draft') {
+        payload.status = req.body.status
+      }
+    }
 
     const updated = await Case.findOneAndUpdate(
       filter,
       payload,
       { new: true, runValidators: true }
     )
-
-    if (!updated) {
-      res.status(404).json({ message: 'Keys topilmadi' })
-      return
-    }
 
     res.json({ status: 'success', case: updated })
   } catch (error) {
@@ -237,7 +289,7 @@ export const getCMCases = async (req: AuthRequest, res: Response): Promise<void>
       filter.category = category as string
     }
     if (search) {
-      filter.title = { $regex: search as string, $options: 'i' }
+      filter.title = { $regex: escapeRegex(search as string), $options: 'i' }
     }
 
     const pageNum = Math.max(1, parseInt(page as string))
