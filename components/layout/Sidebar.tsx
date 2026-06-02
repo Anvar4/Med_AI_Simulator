@@ -2,6 +2,7 @@
 'use client'
 
 import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context';
+import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -169,6 +170,9 @@ export default function Sidebar() {
 										</div>
 									</div>
 								)}
+								<div className='px-1 pb-1'>
+									<LanguageSwitcher />
+								</div>
 								<Link
 									href='/settings'
 									onClick={() => setMobileOpen(false)}

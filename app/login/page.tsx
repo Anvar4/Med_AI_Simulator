@@ -2,8 +2,10 @@
 'use client'
 
 import Button from '@/components/ui/Button';
+import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import { api } from '@/lib/api';
 import { backendUserToAuth, useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import {
@@ -18,6 +20,7 @@ import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
 const { login, loginWithData, user } = useAuth()
+const { t } = useT()
 const router = useRouter()
 const [username, setUsername] = useState('')
 const [password, setPassword] = useState('')
@@ -64,7 +67,10 @@ setIsGoogleLoading(false)
 })
 
 return (
-<div className='min-h-screen bg-secondary flex'>
+<div className='min-h-screen bg-secondary flex relative'>
+<div className='absolute top-4 right-4 z-20'>
+<LanguageSwitcher />
+</div>
 {/* Left branding */}
 <div className='hidden lg:flex lg:w-1/2 relative overflow-hidden'>
 <div className='absolute inset-0 bg-linear-to-br from-primary/20 via-secondary to-secondary' />
@@ -112,11 +118,11 @@ className='w-full max-w-md'
 
 <div className='bg-surface rounded-2xl border border-border p-6 sm:p-8'>
 <div className='mb-6'>
-<h2 className='text-xl font-bold text-text-primary mb-1'>Tizimga kirish</h2>
+<h2 className='text-xl font-bold text-text-primary mb-1'>{t('auth.signInTitle')}</h2>
 <p className='text-sm text-text-secondary'>
-Akkauntingizga kiring yoki{' '}
+{t('auth.signInSubtitle')}{' '}
 <Link href='/register' className='text-primary hover:underline'>
-ro&apos;yxatdan o&apos;ting
+{t('auth.registerLink')}
 </Link>
 </p>
 </div>
@@ -134,18 +140,18 @@ className='w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-
 <path fill='#FBBC05' d='M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z' />
 <path fill='#EA4335' d='M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z' />
 </svg>
-{isGoogleLoading ? 'Kirish...' : 'Google orqali kirish'}
+{isGoogleLoading ? t('auth.loggingIn') : t('auth.googleLogin')}
 </button>
 
 <div className='flex items-center gap-3 mb-4'>
 <div className='h-px flex-1 bg-border' />
-<span className='text-xs text-text-secondary'>yoki</span>
+<span className='text-xs text-text-secondary'>{t('auth.or')}</span>
 <div className='h-px flex-1 bg-border' />
 </div>
 
 <form onSubmit={handleSubmit} className='space-y-4'>
 <div>
-<label className='text-xs font-medium text-text-secondary mb-1.5 block'>Login</label>
+<label className='text-xs font-medium text-text-secondary mb-1.5 block'>{t('auth.username')}</label>
 <div className='relative'>
 <UserCheck className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/50' />
 <input
@@ -160,9 +166,9 @@ className='w-full bg-surface-light border border-border rounded-xl pl-10 pr-4 py
 </div>
 <div>
 <div className='flex items-center justify-between mb-1.5'>
-<label className='text-xs font-medium text-text-secondary'>Parol</label>
+<label className='text-xs font-medium text-text-secondary'>{t('auth.password')}</label>
 <Link href='/forgot-password' className='text-xs text-primary hover:underline'>
-Parolni unutdingizmi?
+{t('auth.forgotPassword')}
 </Link>
 </div>
 <div className='relative'>
@@ -196,14 +202,14 @@ className='text-sm text-accent bg-accent/10 rounded-lg px-3 py-2'
 )}
 
 <Button size='lg' className='w-full' disabled={isSubmitting || isGoogleLoading}>
-{isSubmitting ? 'Kirish...' : 'Kirish'}
+{isSubmitting ? t('auth.loggingIn') : t('auth.login')}
 </Button>
 </form>
 
 <p className='text-center text-sm text-text-secondary mt-4'>
-Akkauntingiz yo&apos;qmi?{' '}
+{t('auth.noAccount')}{' '}
 <Link href='/register' className='text-primary hover:underline font-medium'>
-Ro&apos;yxatdan o&apos;ting
+{t('auth.register')}
 </Link>
 </p>
 </div>

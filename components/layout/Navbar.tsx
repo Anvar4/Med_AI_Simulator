@@ -1,20 +1,23 @@
 'use client'
 
 import Button from '@/components/ui/Button'
+import LanguageSwitcher from '@/components/layout/LanguageSwitcher'
+import { useT } from '@/lib/language-context'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity, Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
-const navLinks = [
-	{ href: '#features', label: 'Xususiyatlar' },
-	{ href: '#pricing', label: 'Narxlar' },
-	{ href: '#how-it-works', label: 'Qanday ishlaydi' },
-	{ href: '#testimonials', label: 'Sharhlar' },
-]
-
 export default function Navbar() {
 	const [isOpen, setIsOpen] = useState(false)
+	const { t } = useT()
+
+	const navLinks = [
+		{ href: '#features', label: t('nav.features') },
+		{ href: '#pricing', label: t('nav.pricing') },
+		{ href: '#how-it-works', label: t('nav.howItWorks') },
+		{ href: '#testimonials', label: t('nav.testimonials') },
+	]
 
 	return (
 		<nav className='fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-secondary/80 border-b border-border'>
@@ -42,13 +45,14 @@ export default function Navbar() {
 					</div>
 
 					<div className='hidden md:flex items-center gap-3'>
+						<LanguageSwitcher />
 						<Link href='/dashboard'>
 							<Button variant='ghost' size='sm'>
-								Kirish
+								{t('auth.login')}
 							</Button>
 						</Link>
 						<Link href='/dashboard'>
-							<Button size='sm'>Bepul Boshlash</Button>
+							<Button size='sm'>{t('nav.getStarted')}</Button>
 						</Link>
 					</div>
 
@@ -82,14 +86,17 @@ export default function Navbar() {
 								</a>
 							))}
 							<div className='pt-3 border-t border-border space-y-2'>
+								<div className='flex justify-center pb-1'>
+									<LanguageSwitcher />
+								</div>
 								<Link href='/dashboard' className='block'>
 									<Button variant='secondary' size='sm' className='w-full'>
-										Kirish
+										{t('auth.login')}
 									</Button>
 								</Link>
 								<Link href='/dashboard' className='block'>
 									<Button size='sm' className='w-full'>
-										Bepul Boshlash
+										{t('nav.getStarted')}
 									</Button>
 								</Link>
 							</div>

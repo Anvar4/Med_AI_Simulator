@@ -21,6 +21,12 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Auth
     'auth.login': 'Kirish',
+    'auth.signInTitle': 'Tizimga kirish',
+    'auth.signInSubtitle': 'Akkauntingizga kiring yoki',
+    'auth.googleLogin': 'Google orqali kirish',
+    'auth.loggingIn': 'Kirish...',
+    'auth.or': 'yoki',
+    'auth.registerLink': 'ro\'yxatdan o\'ting',
     'auth.logout': 'Chiqish',
     'auth.register': 'Ro\'yxatdan o\'tish',
     'auth.username': 'Login',
@@ -48,6 +54,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.admin': 'Admin panel',
     'nav.settings': 'Sozlamalar',
     'nav.career': 'Karyera',
+    'nav.getStarted': 'Bepul Boshlash',
     'nav.features': 'Imkoniyatlar',
     'nav.pricing': 'Narxlar',
     'nav.howItWorks': 'Qanday ishlaydi',
@@ -227,6 +234,12 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Auth
     'auth.login': 'Login',
+    'auth.signInTitle': 'Sign in',
+    'auth.signInSubtitle': 'Sign in to your account or',
+    'auth.googleLogin': 'Sign in with Google',
+    'auth.loggingIn': 'Signing in...',
+    'auth.or': 'or',
+    'auth.registerLink': 'register',
     'auth.logout': 'Logout',
     'auth.register': 'Register',
     'auth.username': 'Username',
@@ -254,6 +267,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.admin': 'Admin Panel',
     'nav.settings': 'Settings',
     'nav.career': 'Career',
+    'nav.getStarted': 'Get Started',
     'nav.features': 'Features',
     'nav.pricing': 'Pricing',
     'nav.howItWorks': 'How it works',
@@ -433,6 +447,12 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Auth
     'auth.login': 'Вход',
+    'auth.signInTitle': 'Вход в систему',
+    'auth.signInSubtitle': 'Войдите в аккаунт или',
+    'auth.googleLogin': 'Войти через Google',
+    'auth.loggingIn': 'Вход...',
+    'auth.or': 'или',
+    'auth.registerLink': 'зарегистрируйтесь',
     'auth.logout': 'Выход',
     'auth.register': 'Регистрация',
     'auth.username': 'Логин',
@@ -460,6 +480,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.admin': 'Админ панель',
     'nav.settings': 'Настройки',
     'nav.career': 'Карьера',
+    'nav.getStarted': 'Начать бесплатно',
     'nav.features': 'Возможности',
     'nav.pricing': 'Цена',
     'nav.howItWorks': 'Как это работает',
