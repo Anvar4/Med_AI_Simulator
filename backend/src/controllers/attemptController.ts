@@ -5,6 +5,45 @@ import { AuthRequest } from '../middleware/auth'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { User } from '../models/User'
+import { difficultyToLevel, unlockedLevel, type LevelStat } from './adaptiveEngine'
+
+/**
+ * Compute the user's unlocked learning level within a single category from
+ * their completed attempts (cheap, single-category aggregation).
+ */
+async function unlockedLevelForCategory(
+  userId: mongoose.Types.ObjectId,
+  category: string
+): Promise<number> {
+  const rows = await CaseAttempt.aggregate([
+    { $match: { user: userId, status: 'completed' } },
+    { $lookup: { from: 'cases', localField: 'case', foreignField: '_id', as: 'c' } },
+    { $unwind: '$c' },
+    { $match: { 'c.category': category } },
+    {
+      $group: {
+        _id: '$c.difficulty',
+        attempts: { $sum: 1 },
+        avgScore: { $avg: '$score' },
+      },
+    },
+  ])
+
+  const byLevel = new Map<number, { attempts: number; scoreSum: number }>()
+  for (const r of rows) {
+    const level = difficultyToLevel(r._id as number)
+    const cur = byLevel.get(level) || { attempts: 0, scoreSum: 0 }
+    cur.attempts += r.attempts
+    cur.scoreSum += r.avgScore * r.attempts
+    byLevel.set(level, cur)
+  }
+  const stats: LevelStat[] = Array.from(byLevel.entries()).map(([level, v]) => ({
+    level: level as LevelStat['level'],
+    attempts: v.attempts,
+    avgScore: Math.round(v.scoreSum / v.attempts),
+  }))
+  return unlockedLevel(stats)
+}
 
 let _openai: OpenAI | null = null
 const getOpenAI = () => {
@@ -31,6 +70,23 @@ export const startAttempt = async (req: AuthRequest, res: Response): Promise<voi
         premiumRequired: true,
       })
       return
+    }
+
+    // Adaptive level gating: a learner may only start cases at or below their
+    // unlocked level in this category. Staff bypass. Resuming an existing
+    // in-progress attempt below also bypasses (it was already allowed).
+    if (!isStaff) {
+      const caseLevel = difficultyToLevel(caseData.difficulty)
+      const unlocked = await unlockedLevelForCategory(req.user!._id, caseData.category)
+      if (caseLevel > unlocked) {
+        res.status(403).json({
+          message: `Bu daraja hali ochilmagan. Avval "${caseData.category}" bo'yicha ${unlocked}-darajani o'zlashtiring.`,
+          levelLocked: true,
+          requiredLevel: caseLevel,
+          unlockedLevel: unlocked,
+        })
+        return
+      }
     }
 
     // Check if user already has an in-progress attempt

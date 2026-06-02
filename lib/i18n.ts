@@ -34,6 +34,11 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Nav & Sidebar
     'nav.dashboard': 'Bosh sahifa',
+    'nav.simulator': '3D Simulator',
+    'nav.courses': 'Kurslar',
+    'nav.library': 'Kutubxona',
+    'nav.leaderboard': 'Liderlar',
+    'nav.content': 'Kontent',
     'nav.cases': 'Klinik holatlar',
     'nav.statistics': 'Statistika',
     'nav.analysis': 'Tahlil',
@@ -235,6 +240,11 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Nav & Sidebar
     'nav.dashboard': 'Dashboard',
+    'nav.simulator': '3D Simulator',
+    'nav.courses': 'Courses',
+    'nav.library': 'Library',
+    'nav.leaderboard': 'Leaderboard',
+    'nav.content': 'Content',
     'nav.cases': 'Clinical Cases',
     'nav.statistics': 'Statistics',
     'nav.analysis': 'Analysis',
@@ -436,6 +446,11 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Nav & Sidebar
     'nav.dashboard': 'Главная',
+    'nav.simulator': '3D Симулятор',
+    'nav.courses': 'Курсы',
+    'nav.library': 'Библиотека',
+    'nav.leaderboard': 'Лидеры',
+    'nav.content': 'Контент',
     'nav.cases': 'Клинические случаи',
     'nav.statistics': 'Статистика',
     'nav.analysis': 'Анализ',

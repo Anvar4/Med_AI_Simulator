@@ -43,6 +43,7 @@ export default function SubscriptionPage() {
 	const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null)
 	const [subscribing, setSubscribing] = useState(false)
 	const [subMsg, setSubMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+	const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null)
 
 	// Promo code section
 	const [promoCode, setPromoCode] = useState('')
@@ -71,17 +72,23 @@ export default function SubscriptionPage() {
 		try {
 			const res = await api.subscriptions.subscribe(selectedPlan.id, billingPeriod)
 			// Subscribing creates a pending payment request; premium is granted only
-			// after the payment is confirmed. Do NOT mark the user premium here.
+			// after the gateway confirms payment. Surface the checkout step.
+			setPendingPaymentId(res.paymentRequestId)
 			setSubMsg({ type: 'success', text: res.message })
-			setTimeout(() => {
-				setSelectedPlan(null)
-				setSubMsg(null)
-				setDiscountApplied(false)
-			}, 6000)
 		} catch (err) {
 			setSubMsg({ type: 'error', text: err instanceof Error ? err.message : 'Xatolik yuz berdi' })
 		} finally {
 			setSubscribing(false)
+		}
+	}
+
+	const handleCheckout = async (provider: 'click' | 'payme') => {
+		if (!pendingPaymentId) return
+		try {
+			const { url } = await api.payments.checkout(pendingPaymentId, provider)
+			window.location.href = url
+		} catch (err) {
+			setSubMsg({ type: 'error', text: err instanceof Error ? err.message : 'To\'lov sahifasini ochib bo\'lmadi' })
 		}
 	}
 
@@ -482,7 +489,7 @@ export default function SubscriptionPage() {
 
 								<div className='bg-primary/5 border border-primary/20 rounded-xl p-3'>
 									<p className='text-xs text-text-secondary'>
-										<strong className='text-text-primary'>To&apos;lov usuli:</strong> Obuna faollashtirilgandan so&apos;ng admin bilan to&apos;lovni kelishib olasiz. Hisob raqamiga pul o&apos;tkazish yoki click/payme orqali to&apos;lash mumkin.
+										<strong className='text-text-primary'>To&apos;lov usuli:</strong> &quot;Obuna bo&apos;lish&quot;ni bosgach Click yoki Payme orqali onlayn to&apos;lov sahifasiga o&apos;tasiz. To&apos;lov tasdiqlangach obuna avtomatik faollashadi.
 									</p>
 								</div>
 
@@ -492,26 +499,47 @@ export default function SubscriptionPage() {
 									</div>
 								)}
 
-								<div className='flex gap-3 pt-2'>
-									<button
-										onClick={() => { setSelectedPlan(null); setSubMsg(null); setDiscountApplied(false) }}
-										disabled={subscribing}
-										className='flex-1 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-surface-light transition-all text-sm font-medium disabled:opacity-50'>
-										Bekor qilish
-									</button>
-									<button
-										onClick={handleSubscribe}
-										disabled={subscribing || subMsg?.type === 'success'}
-										className='flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-secondary text-sm font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2'>
-										{subscribing ? (
-											<><Loader2 className='w-4 h-4 animate-spin' /> Faollashtirilmoqda...</>
-										) : subMsg?.type === 'success' ? (
-											<><CheckCircle className='w-4 h-4' /> Faollashtirildi</>
-										) : (
-											<><Zap className='w-4 h-4' /> Obuna bo&apos;lish</>
-										)}
-									</button>
-								</div>
+								{pendingPaymentId ? (
+									<div className='space-y-2 pt-2'>
+										<p className='text-xs text-text-secondary text-center'>To&apos;lov tizimini tanlang:</p>
+										<div className='flex gap-3'>
+											<button
+												onClick={() => handleCheckout('click')}
+												className='flex-1 py-2.5 rounded-xl bg-[#00aaff] hover:opacity-90 text-white text-sm font-semibold transition-all'>
+												Click orqali to&apos;lash
+											</button>
+											<button
+												onClick={() => handleCheckout('payme')}
+												className='flex-1 py-2.5 rounded-xl bg-[#33b3d6] hover:opacity-90 text-white text-sm font-semibold transition-all'>
+												Payme orqali to&apos;lash
+											</button>
+										</div>
+										<button
+											onClick={() => { setSelectedPlan(null); setSubMsg(null); setDiscountApplied(false); setPendingPaymentId(null) }}
+											className='w-full py-2 rounded-xl border border-border text-text-secondary hover:bg-surface-light transition-all text-xs font-medium'>
+											Yopish
+										</button>
+									</div>
+								) : (
+									<div className='flex gap-3 pt-2'>
+										<button
+											onClick={() => { setSelectedPlan(null); setSubMsg(null); setDiscountApplied(false) }}
+											disabled={subscribing}
+											className='flex-1 py-2.5 rounded-xl border border-border text-text-secondary hover:bg-surface-light transition-all text-sm font-medium disabled:opacity-50'>
+											Bekor qilish
+										</button>
+										<button
+											onClick={handleSubscribe}
+											disabled={subscribing}
+											className='flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-secondary text-sm font-semibold transition-all disabled:opacity-60 flex items-center justify-center gap-2'>
+											{subscribing ? (
+												<><Loader2 className='w-4 h-4 animate-spin' /> Tayyorlanmoqda...</>
+											) : (
+												<><Zap className='w-4 h-4' /> Obuna bo&apos;lish</>
+											)}
+										</button>
+									</div>
+								)}
 							</div>
 						</motion.div>
 					</motion.div>

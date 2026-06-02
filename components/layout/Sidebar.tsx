@@ -2,6 +2,7 @@
 'use client'
 
 import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     Activity,
@@ -32,33 +33,34 @@ export default function Sidebar() {
 	const [mobileOpen, setMobileOpen] = useState(false)
 	const pathname = usePathname()
 	const { user, logout } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
 
 	const menuItems = useMemo(() => {
 		const items = [
-			{ href: '/dashboard', icon: Home, label: 'Dashboard' },
-			{ href: '/cases', icon: Stethoscope, label: 'Klinik holatlar' },
-			{ href: '/statistics', icon: BarChart3, label: 'Statistika' },
-			{ href: '/simulator', icon: Activity, label: '3D Simulator' },
-			{ href: '/kurslar', icon: PlayCircle, label: 'Kurslar' },
-			{ href: '/library', icon: BookOpen, label: 'Kutubxona' },
+			{ href: '/dashboard', icon: Home, label: t('nav.dashboard') },
+			{ href: '/cases', icon: Stethoscope, label: t('nav.cases') },
+			{ href: '/statistics', icon: BarChart3, label: t('nav.statistics') },
+			{ href: '/simulator', icon: Activity, label: t('nav.simulator') },
+			{ href: '/kurslar', icon: PlayCircle, label: t('nav.courses') },
+			{ href: '/library', icon: BookOpen, label: t('nav.library') },
 		]
 		if (!user || !canAccessContentManager(user.role)) {
 			items.push(
-				{ href: '/analysis', icon: Brain, label: 'Tahlil' },
-				{ href: '/leaderboard', icon: Trophy, label: 'Liderlar' },
-				{ href: '/emergency', icon: Zap, label: 'Shoshilinch' },
+				{ href: '/analysis', icon: Brain, label: t('nav.analysis') },
+				{ href: '/leaderboard', icon: Trophy, label: t('nav.leaderboard') },
+				{ href: '/emergency', icon: Zap, label: t('nav.emergency') },
 			)
 		}
-		items.push({ href: '/subscription', icon: CreditCard, label: 'Obuna' })
+		items.push({ href: '/subscription', icon: CreditCard, label: t('nav.subscription') })
 		if (user && canAccessContentManager(user.role)) {
-			items.push({ href: '/content-manager', icon: UserCog, label: 'Kontent' })
+			items.push({ href: '/content-manager', icon: UserCog, label: t('nav.content') })
 		}
 		if (user && canAccessAdmin(user.role)) {
-			items.push({ href: '/admin', icon: Shield, label: 'Admin' })
+			items.push({ href: '/admin', icon: Shield, label: t('nav.admin') })
 		}
 		return items
-	}, [user])
+	}, [user, t])
 
 	const handleLogout = () => {
 		logout()
@@ -173,14 +175,14 @@ export default function Sidebar() {
 									className='flex items-center gap-3 px-3 py-2.5 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all duration-200'
 								>
 									<Settings className='w-5 h-5 shrink-0' />
-									<span className='text-sm font-medium'>Sozlamalar</span>
+									<span className='text-sm font-medium'>{t('nav.settings')}</span>
 								</Link>
 								<button
 									onClick={handleLogout}
 									className='flex items-center gap-3 px-3 py-2.5 rounded-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-all duration-200 w-full'
 								>
 									<LogOut className='w-5 h-5 shrink-0' />
-									<span className='text-sm font-medium'>Chiqish</span>
+									<span className='text-sm font-medium'>{t('auth.logout')}</span>
 								</button>
 							</div>
 						</motion.aside>
@@ -291,7 +293,7 @@ export default function Sidebar() {
 									exit={{ opacity: 0 }}
 									className='text-sm font-medium whitespace-nowrap'
 								>
-									Chiqish
+									{t('auth.logout')}
 								</motion.span>
 							)}
 						</AnimatePresence>

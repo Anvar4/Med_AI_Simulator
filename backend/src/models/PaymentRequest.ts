@@ -27,6 +27,16 @@ export interface IPaymentRequest extends Document {
   paidAt?: Date
   confirmedBy?: mongoose.Types.ObjectId // admin who manually confirmed
   note?: string
+  // Payme JSON-RPC transaction bookkeeping (state machine per Payme spec):
+  //   1 = created (awaiting perform), 2 = performed, -1 = cancelled while created,
+  //   -2 = cancelled after performed.
+  gateway?: {
+    transactionState?: number
+    createTime?: number
+    performTime?: number
+    cancelTime?: number
+    cancelReason?: number
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -56,6 +66,13 @@ const paymentRequestSchema = new Schema<IPaymentRequest>(
     paidAt: { type: Date },
     confirmedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     note: { type: String },
+    gateway: {
+      transactionState: { type: Number },
+      createTime: { type: Number },
+      performTime: { type: Number },
+      cancelTime: { type: Number },
+      cancelReason: { type: Number },
+    },
   },
   { timestamps: true }
 )

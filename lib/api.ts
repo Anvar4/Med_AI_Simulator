@@ -410,9 +410,66 @@ export const api = {
         `/courses/certificates/verify/${encodeURIComponent(serial)}`
       ),
   },
+
+  // ─── Speech-to-Text (voice input) ──────────────────────────
+  stt: {
+    transcribe: async (audio: Blob, language: 'uz' | 'ru' | 'en' = 'uz'): Promise<{ status: string; text: string }> => {
+      const token = getToken()
+      const form = new FormData()
+      form.append('audio', audio, 'recording.webm')
+      form.append('language', language)
+      // Do NOT set Content-Type — the browser adds the multipart boundary.
+      const res = await fetch(`${API_URL}/stt`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: form,
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error((data && data.message) || 'Nutqni aniqlab bo\'lmadi')
+      }
+      return data as { status: string; text: string }
+    },
+  },
+
+  // ─── Payments (Click / Payme hosted checkout) ──────────────
+  payments: {
+    checkout: (paymentRequestId: string, provider: 'click' | 'payme') =>
+      request<{ status: string; url: string; provider: string }>(
+        `/payments/checkout/${paymentRequestId}?provider=${provider}`
+      ),
+  },
+
+  // ─── Adaptive learning ──────────────────────────────────────
+  learning: {
+    path: () =>
+      request<{ status: string; path: LearningPathItem[] }>('/learning/path'),
+
+    recommendations: (params: { category?: string; limit?: number } = {}) => {
+      const qs = new URLSearchParams()
+      if (params.category) qs.set('category', params.category)
+      if (params.limit) qs.set('limit', String(params.limit))
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      return request<{ status: string; recommendations: RecommendedCase[]; targets: { category: string; level: number; struggling: boolean }[] }>(
+        `/learning/recommendations${suffix}`
+      )
+    },
+  },
 }
 
 // ─── Types ────────────────────────────────────────────────────
+
+export interface LearningPathItem {
+  category: string
+  stats: { level: 1 | 2 | 3; attempts: number; avgScore: number }[]
+  unlockedLevel: 1 | 2 | 3
+  recommendation: {
+    action: 'start' | 'reinforce' | 'continue' | 'mastered'
+    targetLevel: 1 | 2 | 3
+  }
+}
+
+export type RecommendedCase = Omit<BackendCase, 'correctDiagnosis' | 'correctTreatment'>
 
 export interface CourseSummary {
   _id: string

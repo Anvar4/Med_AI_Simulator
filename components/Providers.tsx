@@ -2,6 +2,7 @@
 
 import ChatWidget from '@/components/ChatWidget'
 import { AuthProvider } from '@/lib/auth-context'
+import { LanguageProvider } from '@/lib/language-context'
 import { ThemeProvider } from '@/lib/theme-context'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { ReactNode } from 'react'
@@ -12,10 +13,12 @@ export default function Providers({ children }: { children: ReactNode }) {
 	return (
 		<GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
 			<AuthProvider>
-				<ThemeProvider>
-					{children}
-					<ChatWidget />
-				</ThemeProvider>
+				<LanguageProvider>
+					<ThemeProvider>
+						{children}
+						<ChatWidget />
+					</ThemeProvider>
+				</LanguageProvider>
 			</AuthProvider>
 		</GoogleOAuthProvider>
 	)

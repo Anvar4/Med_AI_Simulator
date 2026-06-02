@@ -2,9 +2,10 @@
 
 import CaseCard from '@/components/cases/CaseCard';
 import Sidebar from '@/components/layout/Sidebar';
-import { api, BackendCase } from '@/lib/api';
+import { api, BackendCase, RecommendedCase } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { motion } from 'framer-motion';
-import { Filter, Loader2, Search } from 'lucide-react';
+import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const types = [
@@ -31,6 +32,8 @@ export default function CasesPage() {
 	const [cases, setCases] = useState<BackendCase[]>([])
 	const [categories, setCategories] = useState<string[]>([])
 	const [loading, setLoading] = useState(true)
+	const [recommendations, setRecommendations] = useState<RecommendedCase[]>([])
+	const { user } = useAuth()
 	const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const loadCases = useCallback(async (search: string, category: string, type: string) => {
@@ -64,6 +67,14 @@ export default function CasesPage() {
 
 	useEffect(() => { loadCases(searchQuery, selectedCategory, selectedType) }, [selectedCategory, selectedType, loadCases, searchQuery])
 
+	// Adaptive recommendations for the signed-in learner.
+	useEffect(() => {
+		if (!user) { setRecommendations([]); return }
+		api.learning.recommendations({ limit: 4 })
+			.then(res => setRecommendations(res.recommendations))
+			.catch(() => setRecommendations([]))
+	}, [user])
+
 	function handleSearchChange(v: string) {
 		setSearchQuery(v)
 		if (searchTimeout.current) clearTimeout(searchTimeout.current)
@@ -89,6 +100,37 @@ export default function CasesPage() {
 								O&apos;zingizga mos klinik holatni tanlang
 						</p>
 					</motion.div>
+
+					{/* Adaptive recommendations */}
+					{recommendations.length > 0 && (
+						<motion.div
+							initial='hidden'
+							animate='visible'
+							variants={fadeIn}
+							className='mb-8 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5'
+						>
+							<div className='flex items-center gap-2 mb-3'>
+								<Sparkles className='w-4 h-4 text-primary' />
+								<h2 className='text-sm font-bold text-text-primary'>Siz uchun tavsiya etiladi</h2>
+								<span className='text-xs text-text-secondary'>(darajangizga moslashtirilgan)</span>
+							</div>
+							<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+								{recommendations.map(c => (
+									<a
+										key={c._id}
+										href={`/cases/${c._id}`}
+										className='block rounded-xl border border-border bg-surface p-3 hover:border-primary/50 transition-colors'
+									>
+										<div className='flex items-center gap-1.5 mb-1.5'>
+											<span className='text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary'>{c.category}</span>
+											<span className='text-[10px] text-text-secondary'>{'★'.repeat(Math.min(5, c.difficulty))}</span>
+										</div>
+										<p className='text-sm font-semibold text-text-primary line-clamp-2'>{c.title}</p>
+									</a>
+								))}
+							</div>
+						</motion.div>
+					)}
 
 					{/* Filters */}
 					<motion.div

@@ -3,8 +3,9 @@
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { AnimatePresence, motion } from 'framer-motion'
-import { MessageCircle, Send, X } from 'lucide-react'
+import { Loader2, Mic, MessageCircle, Send, Square, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useVoiceInput } from '@/lib/use-voice-input'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -23,6 +24,16 @@ export default function ChatWidget() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const voice = useVoiceInput('uz')
+
+  async function handleMic() {
+    if (voice.state === 'recording') {
+      const text = await voice.stopAndTranscribe()
+      if (text) setInput(prev => (prev ? `${prev} ${text}` : text))
+    } else {
+      voice.start()
+    }
+  }
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -166,10 +177,29 @@ export default function ChatWidget() {
                   ref={inputRef}
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  placeholder='Savol yozing...'
-                  disabled={loading}
+                  placeholder={voice.state === 'recording' ? 'Tinglanmoqda...' : 'Savol yozing...'}
+                  disabled={loading || voice.state === 'transcribing'}
                   className='flex-1 bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50'
                 />
+                {voice.supported && (
+                  <button
+                    type='button'
+                    onClick={handleMic}
+                    disabled={loading || voice.state === 'transcribing'}
+                    title={voice.state === 'recording' ? 'To\'xtatish' : 'Ovozli kiritish'}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors disabled:opacity-40 shrink-0 ${
+                      voice.state === 'recording' ? 'bg-accent text-white animate-pulse' : 'bg-surface-light border border-border text-text-secondary hover:text-primary'
+                    }`}
+                  >
+                    {voice.state === 'transcribing' ? (
+                      <Loader2 className='w-4 h-4 animate-spin' />
+                    ) : voice.state === 'recording' ? (
+                      <Square className='w-4 h-4' />
+                    ) : (
+                      <Mic className='w-4 h-4' />
+                    )}
+                  </button>
+                )}
                 <button
                   type='submit'
                   disabled={loading || !input.trim()}

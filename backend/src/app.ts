@@ -13,6 +13,10 @@ import attemptRoutes from './routes/attempts';
 import authRoutes from './routes/auth';
 import caseRoutes from './routes/cases';
 import chatRoutes from './routes/chat';
+import courseRoutes from './routes/courses';
+import learningRoutes from './routes/learning';
+import paymentRoutes from './routes/payments';
+import sttRoutes from './routes/stt';
 import statsRoutes from './routes/stats';
 import subscriptionRoutes from './routes/subscriptions';
 import ttsRoutes from './routes/tts';
@@ -95,8 +99,12 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
 app.use('/api/subscriptions', subscriptionRoutes)
 app.use('/api/tts', ttsRoutes)
+app.use('/api/stt', sttRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/courses', courseRoutes)
+app.use('/api/learning', learningRoutes)
+app.use('/api/payments', paymentRoutes)
 
 app.get('/api/health', (_req, res) => {
   res.json({

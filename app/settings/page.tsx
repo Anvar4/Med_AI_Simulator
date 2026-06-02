@@ -5,6 +5,8 @@ import Sidebar from '@/components/layout/Sidebar';
 import Card from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
+import { Locale } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -70,6 +72,7 @@ function OtpRow({
 export default function SettingsPage() {
 	const { user, updateUser } = useAuth()
 	const { theme, setTheme } = useTheme()
+	const { setLocale } = useT()
 	const router = useRouter()
 
 	// Profile
@@ -238,6 +241,7 @@ export default function SettingsPage() {
 		const updated = { ...preferences, [key]: val }
 		setPreferences(updated)
 		if (key === 'darkMode') setTheme(val ? 'dark' : 'light')
+		if (key === 'language') setLocale(val as Locale)
 		updateUser({ preferences: updated })
 		setSettingsSaving(true)
 		try { await api.auth.updateProfile({ [`preferences.${key}`]: val }) } catch { /* silent */ } finally { setSettingsSaving(false) }
