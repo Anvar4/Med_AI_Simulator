@@ -4,7 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { AdminCategory, AdminStats, api, BackendCase, BackendUser, PaymentRequestRow, PromoCode } from '@/lib/api';
+import { AdminCategory, AdminStats, api, BackendCase, BackendUser, PaymentRequestRow, PromoCode, RevenueAnalytics, ServerHealth } from '@/lib/api';
 import { canAccessAdmin, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -35,6 +35,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const fadeIn = {
 	hidden: { opacity: 0, y: 20 },
 	visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+}
+
+function formatUptime(seconds: number): string {
+	const d = Math.floor(seconds / 86400)
+	const h = Math.floor((seconds % 86400) / 3600)
+	const m = Math.floor((seconds % 3600) / 60)
+	if (d > 0) return `${d}k ${h}s`
+	if (h > 0) return `${h}s ${m}d`
+	return `${m}d`
 }
 
 type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review'
@@ -287,6 +296,8 @@ export default function AdminPage() {
 	const [stats, setStats] = useState<AdminStats | null>(null)
 	const [recentUsers, setRecentUsers] = useState<BackendUser[]>([])
 	const [statsLoading, setStatsLoading] = useState(false)
+	const [revenue, setRevenue] = useState<RevenueAnalytics | null>(null)
+	const [serverHealth, setServerHealth] = useState<ServerHealth | null>(null)
 
 	// Payments state
 	const [payments, setPayments] = useState<PaymentRequestRow[]>([])
@@ -339,12 +350,16 @@ export default function AdminPage() {
 	const loadDashboard = useCallback(async () => {
 		setStatsLoading(true)
 		try {
-			const [statsRes, actRes] = await Promise.all([
+			const [statsRes, actRes, revRes, healthRes] = await Promise.all([
 				api.admin.getSystemStats(),
 				api.admin.getRecentActivity(),
+				api.admin.getRevenue().catch(() => null),
+				api.admin.getServerHealth().catch(() => null),
 			])
 			setStats(statsRes.stats)
 			setRecentUsers(actRes.recentUsers ?? [])
+			if (revRes) setRevenue(revRes.revenue)
+			if (healthRes) setServerHealth(healthRes.server)
 		} catch {
 			// silent
 		} finally {
@@ -407,6 +422,15 @@ export default function AdminPage() {
 	}, [])
 
 	useEffect(() => { if (tab === 'dashboard') loadDashboard() }, [tab, loadDashboard])
+
+	// Live server-health refresh while the dashboard tab is open.
+	useEffect(() => {
+		if (tab !== 'dashboard') return
+		const id = setInterval(() => {
+			api.admin.getServerHealth().then(r => setServerHealth(r.server)).catch(() => {})
+		}, 10000)
+		return () => clearInterval(id)
+	}, [tab])
 	useEffect(() => { if (tab === 'users') loadUsers(userPage, userSearch, userRole) }, [tab, userPage, userRole, loadUsers, userSearch])
 	useEffect(() => { if (tab === 'promo') loadPromoCodes(promoPage, promoTypeFilter) }, [tab, promoPage, promoTypeFilter, loadPromoCodes])
 	useEffect(() => { if (tab === 'categories') loadCategories() }, [tab, loadCategories])
@@ -536,6 +560,129 @@ export default function AdminPage() {
 											</Card>
 										))}
 									</div>
+
+									{/* ── Revenue (real, from confirmed payments) ── */}
+									{revenue && (
+										<div>
+											<div className='flex items-center gap-2 mb-3'>
+												<Crown className='w-5 h-5 text-success' />
+												<h3 className='text-lg font-semibold text-text-primary'>Daromad (real to&apos;lovlar)</h3>
+											</div>
+											<div className='grid grid-cols-2 lg:grid-cols-4 gap-4'>
+												{[
+													{ label: 'Bugun', value: revenue.today, count: revenue.todayCount },
+													{ label: 'Oxirgi 7 kun', value: revenue.week, count: revenue.weekCount },
+													{ label: 'Oxirgi 30 kun', value: revenue.month, count: revenue.monthCount },
+													{ label: 'Jami', value: revenue.allTime, count: revenue.allTimeCount },
+												].map(r => (
+													<Card key={r.label} hover={false}>
+														<p className='text-xs text-text-secondary mb-1'>{r.label}</p>
+														<p className='text-2xl font-bold text-success'>{r.value.toLocaleString()} <span className='text-sm text-text-secondary'>{revenue.currency}</span></p>
+														<p className='text-xs text-text-secondary mt-1'>{r.count} ta to&apos;lov</p>
+													</Card>
+												))}
+											</div>
+											<div className='grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4'>
+												<Card hover={false} className='lg:col-span-2'>
+													<p className='text-sm font-semibold text-text-primary mb-3'>Kunlik daromad (30 kun)</p>
+													{revenue.daily.length === 0 ? (
+														<p className='text-sm text-text-secondary py-6 text-center'>Hali to&apos;lov yo&apos;q</p>
+													) : (
+														<div className='flex items-end gap-1 h-32'>
+															{(() => {
+																const max = Math.max(...revenue.daily.map(d => d.total), 1)
+																return revenue.daily.map(d => (
+																	<div key={d.date} className='flex-1 group relative flex flex-col justify-end'>
+																		<div className='bg-primary/70 hover:bg-primary rounded-t transition-all' style={{ height: `${Math.max(4, (d.total / max) * 100)}%` }} />
+																		<span className='absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] bg-surface px-1.5 py-0.5 rounded border border-border opacity-0 group-hover:opacity-100 whitespace-nowrap z-10'>
+																			{d.total.toLocaleString()} · {d.date.slice(5)}
+																		</span>
+																	</div>
+																))
+															})()}
+														</div>
+													)}
+												</Card>
+												<Card hover={false}>
+													<p className='text-sm font-semibold text-text-primary mb-3'>Reja bo&apos;yicha</p>
+													{revenue.byPlan.length === 0 ? (
+														<p className='text-sm text-text-secondary'>Ma&apos;lumot yo&apos;q</p>
+													) : (
+														<div className='space-y-2'>
+															{revenue.byPlan.map(p => (
+																<div key={p.plan} className='flex items-center justify-between text-sm'>
+																	<span className='font-medium text-text-primary uppercase'>{p.plan}</span>
+																	<span className='text-text-secondary'>{p.total.toLocaleString()} ({p.count})</span>
+																</div>
+															))}
+															{revenue.pendingCount > 0 && (
+																<div className='flex items-center justify-between text-sm pt-2 mt-2 border-t border-border'>
+																	<span className='text-warning'>Kutilmoqda</span>
+																	<span className='text-warning'>{revenue.pending.toLocaleString()} ({revenue.pendingCount})</span>
+																</div>
+															)}
+														</div>
+													)}
+												</Card>
+											</div>
+										</div>
+									)}
+
+									{/* ── Server health (live) ── */}
+									{serverHealth && (
+										<div>
+											<div className='flex items-center gap-2 mb-3'>
+												<Server className='w-5 h-5 text-primary' />
+												<h3 className='text-lg font-semibold text-text-primary'>Server holati</h3>
+												<span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+													serverHealth.healthLevel === 'healthy' ? 'bg-success/15 text-success'
+													: serverHealth.healthLevel === 'busy' ? 'bg-warning/15 text-warning'
+													: 'bg-accent/15 text-accent'
+												}`}>
+													{serverHealth.healthLevel === 'healthy' ? 'Barqaror' : serverHealth.healthLevel === 'busy' ? 'Band' : 'Kritik'}
+												</span>
+												<span className='ml-auto inline-flex items-center gap-1.5 text-xs text-text-secondary'>
+													<span className='w-2 h-2 rounded-full bg-success animate-pulse' /> Jonli
+												</span>
+											</div>
+											<div className='grid grid-cols-2 lg:grid-cols-4 gap-4'>
+												{/* CPU */}
+												<Card hover={false}>
+													<p className='text-xs text-text-secondary mb-1'>CPU yuki</p>
+													<p className='text-2xl font-bold text-text-primary'>{serverHealth.cpu.percent}%</p>
+													<div className='mt-2 h-1.5 rounded-full bg-surface-light overflow-hidden'>
+														<div className={`h-full ${serverHealth.cpu.percent > 90 ? 'bg-accent' : serverHealth.cpu.percent > 70 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${serverHealth.cpu.percent}%` }} />
+													</div>
+													<p className='text-[11px] text-text-secondary mt-1'>{serverHealth.cpu.cores} yadro</p>
+												</Card>
+												{/* RAM */}
+												<Card hover={false}>
+													<p className='text-xs text-text-secondary mb-1'>Operativ xotira (RAM)</p>
+													<p className='text-2xl font-bold text-text-primary'>{serverHealth.memory.percent}%</p>
+													<div className='mt-2 h-1.5 rounded-full bg-surface-light overflow-hidden'>
+														<div className={`h-full ${serverHealth.memory.percent > 90 ? 'bg-accent' : serverHealth.memory.percent > 70 ? 'bg-warning' : 'bg-primary'}`} style={{ width: `${serverHealth.memory.percent}%` }} />
+													</div>
+													<p className='text-[11px] text-text-secondary mt-1'>{serverHealth.memory.usedMB.toLocaleString()} / {serverHealth.memory.totalMB.toLocaleString()} MB</p>
+												</Card>
+												{/* Uptime + DB */}
+												<Card hover={false}>
+													<p className='text-xs text-text-secondary mb-1'>Ishlash vaqti</p>
+													<p className='text-2xl font-bold text-text-primary'>{formatUptime(serverHealth.uptimeSeconds)}</p>
+													<p className={`text-[11px] mt-2 inline-flex items-center gap-1 ${serverHealth.database.connected ? 'text-success' : 'text-accent'}`}>
+														<span className={`w-1.5 h-1.5 rounded-full ${serverHealth.database.connected ? 'bg-success' : 'bg-accent'}`} />
+														MongoDB {serverHealth.database.connected ? 'ulangan' : 'uzilgan'}
+													</p>
+												</Card>
+												{/* Live activity */}
+												<Card hover={false}>
+													<p className='text-xs text-text-secondary mb-1'>Jonli faollik (5 daq)</p>
+													<p className='text-2xl font-bold text-text-primary'>{serverHealth.liveActivity.activeLast5min}</p>
+													<p className='text-[11px] text-text-secondary mt-2'>{serverHealth.liveActivity.attemptsLast5min} urinish</p>
+													<p className='text-[11px] text-text-secondary mt-1'>{serverHealth.platform.node} · {serverHealth.cpu.cores}×CPU</p>
+												</Card>
+											</div>
+										</div>
+									)}
 
 									{/* Extra stats */}
 									{stats && (

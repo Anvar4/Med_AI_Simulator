@@ -255,6 +255,12 @@ export const api = {
     getAnalytics: () =>
       request<{ status: string; analytics: AdminAnalytics }>('/admin/analytics'),
 
+    getRevenue: () =>
+      request<{ status: string; revenue: RevenueAnalytics }>('/admin/revenue'),
+
+    getServerHealth: () =>
+      request<{ status: string; server: ServerHealth }>('/admin/server-health'),
+
     // Payment requests (manual confirmation)
     getPayments: (params?: { status?: string; page?: number }) => {
       const qs = new URLSearchParams()
@@ -515,6 +521,32 @@ export const api = {
 }
 
 // ─── Types ────────────────────────────────────────────────────
+
+export interface RevenueAnalytics {
+  currency: string
+  today: number
+  todayCount: number
+  week: number
+  weekCount: number
+  month: number
+  monthCount: number
+  allTime: number
+  allTimeCount: number
+  pending: number
+  pendingCount: number
+  byPlan: { plan: string; total: number; count: number }[]
+  daily: { date: string; total: number; count: number }[]
+}
+
+export interface ServerHealth {
+  healthLevel: 'healthy' | 'busy' | 'critical'
+  uptimeSeconds: number
+  memory: { usedMB: number; totalMB: number; percent: number; processHeapMB: number; processRssMB: number }
+  cpu: { cores: number; model: string; loadAvg1: number; percent: number }
+  database: { connected: boolean; state: string }
+  liveActivity: { activeLast5min: number; attemptsLast5min: number }
+  platform: { node: string; os: string; arch: string }
+}
 
 export interface PaymentRequestRow {
   _id: string
