@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Card from '@/components/ui/Card';
 import { api, Attempt, UserStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { motion } from 'framer-motion';
 import { Activity, Award, BarChart3, BookOpen, Brain, Stethoscope, Target, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -99,6 +100,7 @@ function ScoreBar({ value, max = 100, color = 'bg-primary' }: { value: number; m
 
 export default function StatisticsPage() {
 	const { user } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
 	const [stats, setStats] = useState<UserStats | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -136,7 +138,7 @@ export default function StatisticsPage() {
 			<main className='lg:pl-64 pt-16 lg:pt-0 pb-6'>
 				<div className='p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6'>
 					<motion.div initial='hidden' animate='visible' variants={fadeIn}>
-						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-1'>Statistika</h1>
+						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-1'>{t('nav.statistics')}</h1>
 						<p className='text-text-secondary text-sm'>Sizning taraqqiyotingiz va natijalaringiz</p>
 						{isDemoMode && <p className='text-xs text-primary mt-2'>Demo statistika ko&apos;rsatilmoqda</p>}
 					</motion.div>

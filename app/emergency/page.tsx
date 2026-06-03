@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Card from '@/components/ui/Card';
 import { api, BackendCase } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Activity, AlertCircle, ArrowRight, CheckCircle, Clock, CreditCard, Filter, Lock, Search, Stethoscope, User, XCircle, Zap } from 'lucide-react';
 import Link from 'next/link';
@@ -26,6 +27,7 @@ function formatTime(seconds: number) {
 
 export default function EmergencyPage() {
 	const { user } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
 	const [cases, setCases] = useState<BackendCase[]>([])
 	const [loading, setLoading] = useState(true)
@@ -242,7 +244,7 @@ export default function EmergencyPage() {
 					<motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className='flex items-center gap-3'>
 						<div className='p-2.5 bg-accent/10 rounded-xl'><Zap className='w-6 h-6 text-accent' /></div>
 						<div>
-							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>Shoshilinch rejim</h1>
+							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>{t('emergency.title')}</h1>
 							<p className='text-text-secondary text-sm'>Vaqt chegarasi: {emergencyWindowLabel} · Holatga qarab</p>
 						</div>
 					</motion.div>

@@ -10,6 +10,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import StatCard from '@/components/ui/StatCard';
 import { api, BackendCase, DashboardStats } from '@/lib/api';
 import { canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { motion } from 'framer-motion';
 import { ArrowRight, BookOpen, Calendar, Flame, Loader2, Target } from 'lucide-react';
 import Link from 'next/link';
@@ -98,6 +99,7 @@ const DEMO_DASHBOARD_STATS: DashboardStats = {
 
 export default function DashboardPage() {
 	const { user } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
 	const [stats, setStats] = useState<DashboardStats | null>(null)
 	const [cases, setCases] = useState<BackendCase[]>([])
@@ -169,13 +171,13 @@ export default function DashboardPage() {
 						className='mb-8'
 					>
 						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-2'>
-							Xush kelibsiz! 👋
+							{t('dashboard.welcome')}
 						</h1>
 						<p className='text-text-secondary'>
-							Bugungi mashg&apos;ulotingizni davom eting
+							{t('dashboard.subtitle')}
 						</p>
 						{isDemoMode && (
-							<p className='text-xs text-primary mt-2'>Demo ma&apos;lumotlar ko&apos;rsatilmoqda</p>
+							<p className='text-xs text-primary mt-2'>{t('dashboard.demoData')}</p>
 						)}
 					</motion.div>
 
@@ -190,28 +192,28 @@ export default function DashboardPage() {
 							<StatCard
 								icon={<BookOpen className='w-5 h-5' />}
 								value={safeStats.totalCases}
-								label='Jami yechilgan klinik holatlar'
+								label={t('dashboard.totalCases')}
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Target className='w-5 h-5' />}
 								value={Math.round(safeStats.avgScore)}
-								label="O'rtacha ball"
+								label={t('dashboard.avgScore')}
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Calendar className='w-5 h-5' />}
 								value={safeStats.weeklyCount}
-								label='Bu hafta'
+								label={t('dashboard.thisWeek')}
 							/>
 						</motion.div>
 						<motion.div variants={fadeIn}>
 							<StatCard
 								icon={<Flame className='w-5 h-5' />}
 								value={`${safeStats.streak} kun 🔥`}
-								label='Streak'
+								label={t('dashboard.streak')}
 							/>
 						</motion.div>
 					</motion.div>
@@ -226,7 +228,7 @@ export default function DashboardPage() {
 						>
 							<Card hover={false}>
 								<h3 className='text-lg font-semibold text-text-primary mb-6'>
-									Haftalik Faollik
+									{t('dashboard.weeklyActivity')}
 								</h3>
 								<ActivityChart data={weeklyActivity} />
 							</Card>
@@ -236,7 +238,7 @@ export default function DashboardPage() {
 						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 							<Card hover={false} className='h-full'>
 								<h3 className='text-lg font-semibold text-text-primary mb-6'>
-									Karyera Progress
+									{t('dashboard.careerProgress')}
 								</h3>
 								<div className='space-y-5'>
 									{(safeStats.categoryScores ?? []).map(
@@ -284,7 +286,7 @@ export default function DashboardPage() {
 									<div className='flex items-center gap-2 mb-2'>
 										<Badge>{continueCaseData.category}</Badge>
 										<span className='text-xs text-text-secondary'>
-											{continueAttempt ? 'Davom etilmoqda' : 'Demo tavsiya'}
+											{continueAttempt ? t('dashboard.continuing') : t('dashboard.demoSuggestion')}
 										</span>
 									</div>
 									<h3 className='text-base font-semibold text-text-primary mb-3'>
@@ -293,7 +295,7 @@ export default function DashboardPage() {
 								</div>
 								<Link href={`/cases/${continueCaseData._id}`}>
 									<Button size='sm'>
-										Davom ettirish <ArrowRight className='w-4 h-4' />
+										{t('dashboard.continueLearning')} <ArrowRight className='w-4 h-4' />
 									</Button>
 								</Link>
 							</div>
@@ -305,11 +307,11 @@ export default function DashboardPage() {
 					<motion.div initial='hidden' animate='visible' variants={stagger}>
 						<div className='flex items-center justify-between mb-4'>
 							<h3 className='text-lg font-semibold text-text-primary'>
-								Tavsiya etilgan klinik holatlar
+								{t('dashboard.recommended')}
 							</h3>
 							<Link href='/cases'>
 								<Button variant='ghost' size='sm'>
-									Barchasi <ArrowRight className='w-4 h-4' />
+									{t('dashboard.seeAll')} <ArrowRight className='w-4 h-4' />
 								</Button>
 							</Link>
 						</div>

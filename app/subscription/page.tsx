@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Card from '@/components/ui/Card';
 import { api, SubscriptionPlan } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Award, Building2, CheckCircle, Copy, CreditCard, GraduationCap, Loader2, Lock, Percent, Share2, Tag, Users, X, Zap } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -23,6 +24,7 @@ function PlanBadge({ plan }: { plan: string }) {
 
 export default function SubscriptionPage() {
 	const { user, updateUser } = useAuth()
+	const { t } = useT()
 	const [plans, setPlans] = useState<SubscriptionPlan[]>([])
 	const [loading, setLoading] = useState(true)
 	const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly')
@@ -137,7 +139,7 @@ export default function SubscriptionPage() {
 						<div className='inline-flex p-3 bg-primary/10 rounded-2xl mb-4'>
 							<CreditCard className='w-8 h-8 text-primary' />
 						</div>
-						<h1 className='text-3xl sm:text-4xl font-bold text-text-primary mb-3'>Obuna rejalari</h1>
+						<h1 className='text-3xl sm:text-4xl font-bold text-text-primary mb-3'>{t('sub.title')}</h1>
 						<p className='text-text-secondary max-w-xl mx-auto'>Med AI Simulator&apos;ning barcha imkoniyatlaridan foydalaning. To&apos;liq klinik holatlar, AI tahlil va professional rivojlanish.</p>
 						{user && currentPlan !== 'free' && (
 							<div className='mt-3 inline-flex items-center gap-2'>

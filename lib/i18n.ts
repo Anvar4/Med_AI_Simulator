@@ -49,6 +49,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.statistics': 'Statistika',
     'nav.analysis': 'Tahlil',
     'nav.emergency': 'Shoshilinch',
+    'emergency.title': 'Shoshilinch rejim',
     'nav.subscription': 'Obuna',
     'nav.contentManager': 'Kontent manager',
     'nav.admin': 'Admin panel',
@@ -72,6 +73,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'dashboard.continueLearning': 'Davom ettirish',
     'dashboard.recommended': 'Tavsiya etilgan klinik holatlar',
     'dashboard.seeAll': 'Barchasi',
+    'dashboard.demoData': 'Demo ma\'lumotlar ko\'rsatilmoqda',
+    'dashboard.continuing': 'Davom etilmoqda',
+    'dashboard.demoSuggestion': 'Demo tavsiya',
 
     // Cases
     'cases.title': 'Klinik Holatlar',
@@ -262,6 +266,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.statistics': 'Statistics',
     'nav.analysis': 'Analysis',
     'nav.emergency': 'Emergency',
+    'emergency.title': 'Emergency mode',
     'nav.subscription': 'Subscription',
     'nav.contentManager': 'Content Manager',
     'nav.admin': 'Admin Panel',
@@ -285,6 +290,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'dashboard.continueLearning': 'Continue Learning',
     'dashboard.recommended': 'Recommended clinical cases',
     'dashboard.seeAll': 'See all',
+    'dashboard.demoData': 'Showing demo data',
+    'dashboard.continuing': 'In progress',
+    'dashboard.demoSuggestion': 'Demo suggestion',
 
     // Cases
     'cases.title': 'Clinical Cases',
@@ -475,6 +483,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.statistics': 'Статистика',
     'nav.analysis': 'Анализ',
     'nav.emergency': 'Экстренная помощь',
+    'emergency.title': 'Экстренный режим',
     'nav.subscription': 'Подписка',
     'nav.contentManager': 'Контент менеджер',
     'nav.admin': 'Админ панель',
@@ -498,6 +507,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'dashboard.continueLearning': 'Продолжить обучение',
     'dashboard.recommended': 'Рекомендуемые случаи',
     'dashboard.seeAll': 'Все',
+    'dashboard.demoData': 'Показаны демо-данные',
+    'dashboard.continuing': 'Продолжается',
+    'dashboard.demoSuggestion': 'Демо-рекомендация',
 
     // Cases
     'cases.title': 'Клинические случаи',
