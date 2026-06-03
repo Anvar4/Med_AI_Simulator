@@ -4,6 +4,7 @@ import CaseCard from '@/components/cases/CaseCard';
 import Sidebar from '@/components/layout/Sidebar';
 import { api, BackendCase, RecommendedCase } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { motion } from 'framer-motion';
 import { Filter, Loader2, Search, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,6 +35,7 @@ export default function CasesPage() {
 	const [loading, setLoading] = useState(true)
 	const [recommendations, setRecommendations] = useState<RecommendedCase[]>([])
 	const { user } = useAuth()
+	const { t } = useT()
 	const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
 	const loadCases = useCallback(async (search: string, category: string, type: string) => {
@@ -94,10 +96,10 @@ export default function CasesPage() {
 						className='mb-8'
 					>
 						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-2'>
-							Klinik Holatlar
+							{t('nav.cases')}
 						</h1>
 						<p className='text-text-secondary'>
-								O&apos;zingizga mos klinik holatni tanlang
+								{t('cases.subtitle')}
 						</p>
 					</motion.div>
 
@@ -111,8 +113,8 @@ export default function CasesPage() {
 						>
 							<div className='flex items-center gap-2 mb-3'>
 								<Sparkles className='w-4 h-4 text-primary' />
-								<h2 className='text-sm font-bold text-text-primary'>Siz uchun tavsiya etiladi</h2>
-								<span className='text-xs text-text-secondary'>(darajangizga moslashtirilgan)</span>
+								<h2 className='text-sm font-bold text-text-primary'>{t('cases.recommendedForYou')}</h2>
+								<span className='text-xs text-text-secondary'>{t('cases.adaptedToLevel')}</span>
 							</div>
 							<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
 								{recommendations.map(c => (
@@ -144,7 +146,7 @@ export default function CasesPage() {
 							<Search className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary' />
 							<input
 								type='text'
-									placeholder='Klinik holat qidiring...'
+									placeholder={t('cases.searchPlaceholder')}
 								value={searchQuery}
 								onChange={e => handleSearchChange(e.target.value)}
 								className='w-full pl-10 pr-4 py-2.5 bg-surface border border-border rounded-xl text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all'

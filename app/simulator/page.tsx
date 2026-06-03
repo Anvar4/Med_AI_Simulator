@@ -3,6 +3,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import BioDigitalViewer from '@/components/simulator/BioDigitalViewer';
 import ControlsPanel, { BIODIGITAL_MODELS } from '@/components/simulator/ControlsPanel';
+import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Activity, ChevronLeft, ChevronRight, Info, Maximize2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -10,6 +11,7 @@ import { useCallback, useState } from 'react';
 const DEFAULT_SRC = BIODIGITAL_MODELS.find(m => m.key === 'male_full')!.src
 
 export default function SimulatorPage() {
+	const { t } = useT()
 	const [selectedSrc, setSelectedSrc] = useState(DEFAULT_SRC)
 	const [panelOpen, setPanelOpen] = useState(true)
 	const [infoOpen, setInfoOpen] = useState(false)
@@ -45,7 +47,7 @@ export default function SimulatorPage() {
 						</div>
 						<div>
 							<h1 className='text-sm font-bold text-text-primary leading-tight'>3D Simulator</h1>
-							<p className='text-xs text-text-secondary hidden sm:block'>BioDigital Human Viewer</p>
+							<p className='text-xs text-text-secondary hidden sm:block'>{t('simulator.viewerSubtitle')}</p>
 						</div>
 					</div>
 

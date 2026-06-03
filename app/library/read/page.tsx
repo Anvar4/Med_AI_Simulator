@@ -2,6 +2,7 @@
 
 import Sidebar from '@/components/layout/Sidebar';
 import { BOOKS, BookSource, getBookSources, isEmbeddableSource, SOURCE_LABELS } from '@/lib/library-data';
+import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     AlertTriangle,
@@ -35,6 +36,7 @@ function SourceIcon({ type }: { type: BookSource['type'] }) {
 
 // Iframe loader + error UI
 function IframeReader({ src, title }: { src: string; title: string }) {
+	const { t } = useT()
 	const iframeRef = useRef<HTMLIFrameElement>(null)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState(false)
@@ -49,7 +51,7 @@ function IframeReader({ src, title }: { src: string; title: string }) {
 			{loading && !error && (
 				<div className='absolute inset-0 flex flex-col items-center justify-center bg-surface z-10 gap-4'>
 					<Loader2 className='w-8 h-8 text-primary animate-spin' />
-					<p className='text-sm text-text-secondary'>Kitob yuklanmoqda...</p>
+					<p className='text-sm text-text-secondary'>{t('library.loadingBook')}</p>
 				</div>
 			)}
 
@@ -60,14 +62,14 @@ function IframeReader({ src, title }: { src: string; title: string }) {
 						<div className='w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4'>
 							<AlertTriangle className='w-7 h-7 text-accent' />
 						</div>
-						<h3 className='text-base font-semibold text-text-primary mb-2'>Yuklab bo&apos;lmadi</h3>
+						<h3 className='text-base font-semibold text-text-primary mb-2'>{t('library.loadFailed')}</h3>
 						<p className='text-sm text-text-secondary mb-5'>
-							Bu manba brauzer tomonidan bloklanishi mumkin. Pastdagi tugma orqali to&apos;g&apos;ridan-to&apos;g&apos;ri oching.
+							{t('library.blockedHint')}
 						</p>
 						<div className='flex gap-3 justify-center'>
 							<button onClick={() => { setLoading(true); setError(false); setRetryKey(k => k + 1) }}
 								className='inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-light border border-border text-sm text-text-secondary hover:text-text-primary transition-colors'>
-								<RefreshCw className='w-4 h-4' /> Qayta urinish
+								<RefreshCw className='w-4 h-4' /> {t('common.retry')}
 							</button>
 							<a href={src} target='_blank' rel='noopener noreferrer'
 								className='inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors'>
@@ -93,6 +95,7 @@ function IframeReader({ src, title }: { src: string; title: string }) {
 }
 
 function ReaderContent() {
+	const { t } = useT()
 	const params = useSearchParams()
 	const bookId = params.get('id')
 	const book = BOOKS.find(b => b.id === bookId)
@@ -130,7 +133,7 @@ function ReaderContent() {
 				<main className='lg:pl-64 pt-16 lg:pt-0 flex items-center justify-center min-h-screen'>
 					<div className='text-center'>
 						<div className='text-5xl mb-4'>📚</div>
-						<h2 className='text-xl font-bold text-text-primary mb-2'>Kitob topilmadi</h2>
+						<h2 className='text-xl font-bold text-text-primary mb-2'>{t('library.bookNotFound')}</h2>
 						<Link href='/library' className='text-primary hover:underline text-sm'>← Kutubxonaga qaytish</Link>
 					</div>
 				</main>
@@ -145,7 +148,7 @@ function ReaderContent() {
 				<main className='lg:pl-64 pt-16 lg:pt-0 flex items-center justify-center min-h-screen'>
 					<div className='text-center'>
 						<div className='text-5xl mb-4'>🔗</div>
-						<h2 className='text-xl font-bold text-text-primary mb-2'>Manba topilmadi</h2>
+						<h2 className='text-xl font-bold text-text-primary mb-2'>{t('library.sourceNotFound')}</h2>
 						<Link href='/library' className='text-primary hover:underline text-sm'>← Kutubxonaga qaytish</Link>
 					</div>
 				</main>
@@ -274,7 +277,7 @@ function ReaderContent() {
 				{/* Bottom: other source quick-switch */}
 				{sources.length > 1 && (
 					<div className='shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2 border-t border-border bg-surface/50 overflow-x-auto'>
-						<span className='text-xs text-text-secondary shrink-0'>Boshqa manbalar:</span>
+						<span className='text-xs text-text-secondary shrink-0'>{t('library.otherSources')}</span>
 						{sources.map((s, i) => {
 							if (i === activeSourceIndex) return null
 							const meta = SOURCE_LABELS[s.type]

@@ -4,6 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Card from '@/components/ui/Card';
 import { api, LeaderboardEntry } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
 import { motion } from 'framer-motion';
 import { Clock, Medal, Star, Trophy, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -38,6 +39,7 @@ function Avatar({ name, avatar, size = 'md' }: { name: string; avatar: string | 
 
 export default function LeaderboardPage() {
 	const { user } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
 	const [loading, setLoading] = useState(true)
 	const [list, setList] = useState<LeaderboardEntry[]>([])
@@ -95,8 +97,8 @@ export default function LeaderboardPage() {
 								<Trophy className='w-6 h-6 text-primary' />
 							</div>
 							<div>
-								<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>Liderlar taxtasi</h1>
-								<p className='text-text-secondary text-sm'>Eng yaxshi natijalarga ega foydalanuvchilar</p>
+								<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>{t('leaderboard.title')}</h1>
+								<p className='text-text-secondary text-sm'>{t('leaderboard.subtitle')}</p>
 							</div>
 						</div>
 					</motion.div>
@@ -113,8 +115,8 @@ export default function LeaderboardPage() {
 						<Card hover={false}>
 							<div className='text-center py-12 space-y-3'>
 								<Users className='w-12 h-12 text-text-secondary/30 mx-auto' />
-								<p className='text-text-primary font-semibold'>Hozircha studentlar reytingi bo&apos;sh</p>
-								<p className='text-text-secondary text-sm'>Birinchi bo&apos;ling!</p>
+								<p className='text-text-primary font-semibold'>{t('leaderboard.empty')}</p>
+								<p className='text-text-secondary text-sm'>{t('leaderboard.beFirst')}</p>
 								<button onClick={() => router.push('/cases')} className='bg-primary text-secondary font-semibold px-5 py-2 rounded-xl text-sm'>
 									Boshlash
 								</button>
@@ -177,8 +179,8 @@ export default function LeaderboardPage() {
 											<span className='text-2xl font-black text-primary w-8 shrink-0'>#{currentUserRank.rank}</span>
 											<Avatar name={currentUserRank.name} avatar={currentUserRank.avatar} />
 											<div className='flex-1 min-w-0'>
-												<p className='font-semibold text-primary truncate'>{currentUserRank.name} (Siz)</p>
-												<p className='text-xs text-text-secondary'>Sizning o&apos;rningiz: #{currentUserRank.rank} · {currentUserRank.totalCompleted} ta klinik holat</p>
+												<p className='font-semibold text-primary truncate'>{currentUserRank.name} ({t('leaderboard.you')})</p>
+												<p className='text-xs text-text-secondary'>{t('leaderboard.yourRank')}: #{currentUserRank.rank} · {currentUserRank.totalCompleted} {t('leaderboard.colCases').toLowerCase()}</p>
 											</div>
 											<div className='text-right shrink-0'>
 												<p className='font-bold text-text-primary'>{currentUserRank.avgScore}%</p>
@@ -195,10 +197,10 @@ export default function LeaderboardPage() {
 									{/* Table header */}
 									<div className='grid grid-cols-[2rem_1fr_auto_auto_auto] gap-3 px-2 pb-3 border-b border-border text-xs font-semibold text-text-secondary uppercase tracking-wide'>
 										<span>#</span>
-										<span>Foydalanuvchi</span>
-										<span className='text-center hidden sm:block'>Holatlar</span>
-										<span className='text-center hidden sm:block'>Eng yaxshi</span>
-										<span className='text-right'>O&apos;rtacha</span>
+										<span>{t('leaderboard.colUser')}</span>
+										<span className='text-center hidden sm:block'>{t('leaderboard.colCases')}</span>
+										<span className='text-center hidden sm:block'>{t('leaderboard.colBest')}</span>
+										<span className='text-right'>{t('leaderboard.colAvg')}</span>
 									</div>
 
 									<div className='divide-y divide-border'>
@@ -221,7 +223,7 @@ export default function LeaderboardPage() {
 													<Avatar name={entry.name} avatar={entry.avatar} size='sm' />
 													<div className='min-w-0'>
 														<p className={`text-sm font-semibold truncate ${entry.isCurrentUser ? 'text-primary' : 'text-text-primary'}`}>
-															{entry.name}{entry.isCurrentUser ? ' (Siz)' : ''}
+															{entry.name}{entry.isCurrentUser ? ` (${t('leaderboard.you')})` : ''}
 														</p>
 														<div className='flex items-center gap-1 text-xs text-text-secondary sm:hidden'>
 															<span>{entry.totalCompleted} holat</span>
@@ -252,7 +254,7 @@ export default function LeaderboardPage() {
 									</div>
 
 									{rest.length === 0 && top3.length === 0 && (
-										<p className='text-center text-text-secondary text-sm py-6'>Jadval bo&apos;sh</p>
+										<p className='text-center text-text-secondary text-sm py-6'>{t('leaderboard.tableEmpty')}</p>
 									)}
 								</Card>
 							</motion.div>
