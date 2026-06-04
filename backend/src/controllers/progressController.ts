@@ -6,10 +6,17 @@ import { Video } from '../models/Video'
 import { VideoProgress } from '../models/VideoProgress'
 
 const COMPLETION_THRESHOLD = 0.9
+// When a video's duration is unknown (YouTube length not stored), require this
+// much real playback before an explicit "mark complete" is honored. This stops
+// a client from forging completion by posting {completed:true, positionSeconds:0}.
+const MIN_WATCH_SECONDS = 30
 
 /**
- * Decide whether a video should be marked complete given playback position and
- * known duration. When duration is unknown we trust an explicit completed flag.
+ * Decide whether a video should be marked complete. Completion is derived from
+ * the SERVER-validated playback position, never from a bare client flag:
+ *  - duration known  -> position must reach COMPLETION_THRESHOLD of it.
+ *  - duration unknown -> the client may request completion, but only once at
+ *    least MIN_WATCH_SECONDS of genuine playback has been recorded.
  * Pure & dependency-free so it can be unit-tested.
  */
 export function shouldComplete(
@@ -17,9 +24,11 @@ export function shouldComplete(
   durationSeconds: number,
   explicit?: boolean
 ): boolean {
-  if (explicit === true) return true
-  if (durationSeconds > 0) return positionSeconds >= durationSeconds * COMPLETION_THRESHOLD
-  return false
+  if (durationSeconds > 0) {
+    return positionSeconds >= durationSeconds * COMPLETION_THRESHOLD
+  }
+  // Unknown duration: honor an explicit request only with real watch time.
+  return explicit === true && positionSeconds >= MIN_WATCH_SECONDS
 }
 
 // ─── Save / update video progress ──────────────────────────────
@@ -30,6 +39,22 @@ export const saveVideoProgress = async (req: AuthRequest, res: Response): Promis
     if (!video) {
       res.status(404).json({ message: 'Video topilmadi' })
       return
+    }
+
+    // Entitlement check: progress (and any certificate it would unlock) may only
+    // be accrued on content the user can actually access. Staff bypass; everyone
+    // else needs a published course and, for premium courses, an active premium.
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'instructor'
+    if (!isStaff) {
+      const course = await Course.findById(video.course).select('isPublished isPremium')
+      if (!course || !course.isPublished || !video.isPublished) {
+        res.status(403).json({ message: 'Bu kursga kirish huquqingiz yo\'q' })
+        return
+      }
+      if (course.isPremium && !req.user!.isPremium) {
+        res.status(403).json({ message: 'Bu premium kurs. Pro obunani faollashtiring.', premiumRequired: true })
+        return
+      }
     }
 
     const positionSeconds = Math.max(0, Number(req.body.positionSeconds) || 0)

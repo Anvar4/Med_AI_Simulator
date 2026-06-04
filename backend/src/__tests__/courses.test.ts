@@ -21,14 +21,20 @@ test('slugify produces url-safe slugs', () => {
   assert.equal(slugify(''), '')
 })
 
-test('shouldComplete respects the 90% threshold and explicit flag', () => {
-  // explicit flag always wins
-  assert.equal(shouldComplete(0, 0, true), true)
-  assert.equal(shouldComplete(0, 100, true), true)
-  // duration known: needs >= 90%
+test('shouldComplete: known duration needs >= 90% position (client flag ignored)', () => {
   assert.equal(shouldComplete(89, 100), false)
   assert.equal(shouldComplete(90, 100), true)
   assert.equal(shouldComplete(100, 100), true)
-  // duration unknown and no explicit flag -> not complete
+  // Even an explicit flag cannot bypass the position requirement.
+  assert.equal(shouldComplete(0, 100, true), false)
+})
+
+test('shouldComplete: forged "complete at 0 seconds" is rejected', () => {
+  // The certificate-forgery attack: {completed:true, positionSeconds:0}
+  assert.equal(shouldComplete(0, 0, true), false)
+  // Unknown duration honors completion only after real watch time (>=30s).
+  assert.equal(shouldComplete(29, 0, true), false)
+  assert.equal(shouldComplete(30, 0, true), true)
+  // No explicit flag and unknown duration -> never complete.
   assert.equal(shouldComplete(9999, 0), false)
 })

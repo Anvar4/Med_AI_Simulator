@@ -4,7 +4,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import { api, CourseDetail, CourseSummary } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { Award, ChevronLeft, Lock, PlayCircle, Search, User } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 function CourseCatalog({ onOpen }: { onOpen: (slug: string) => void }) {
   const [courses, setCourses] = useState<CourseSummary[]>([])
@@ -109,6 +109,9 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [loading, setLoading] = useState(true)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [certMsg, setCertMsg] = useState<string | null>(null)
+  // Tracks when the current video was opened, so "mark complete" reports real
+  // elapsed watch time (the server requires a minimum before completing).
+  const watchStartRef = useRef<number>(Date.now())
 
   const load = useCallback(() => {
     setLoading(true)
@@ -125,17 +128,23 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
 
   useEffect(() => { load() }, [load])
 
+  // Restart the watch timer whenever the active video changes.
+  useEffect(() => { watchStartRef.current = Date.now() }, [activeVideoId])
+
   const allVideos = course?.playlists.flatMap(p => p.videos) ?? []
   const activeVideo = allVideos.find(v => v._id === activeVideoId) ?? null
 
   const markComplete = async (videoId: string) => {
     if (!user) return
+    // Report the real seconds spent on this video; the server validates it.
+    const watchedSeconds = Math.floor((Date.now() - watchStartRef.current) / 1000)
     try {
-      const res = await api.courses.saveProgress(videoId, 0, true)
+      const res = await api.courses.saveProgress(videoId, watchedSeconds, true)
       if (res.certificate) setCertMsg(`Tabriklaymiz! Sertifikat berildi: ${res.certificate.serial}`)
       load()
-    } catch {
-      // ignore — progress is best-effort
+    } catch (err) {
+      // Surface the entitlement / watch-time errors instead of swallowing them.
+      setCertMsg(err instanceof Error ? err.message : null)
     }
   }
 
