@@ -1,9 +1,7 @@
-import dotenv from 'dotenv';
+import './loadEnv'; // MUST be first — loads .env before other imports read process.env
 import mongoose from 'mongoose';
 import app from './app';
 import { initTelegramBot } from './services/telegramBot';
-
-dotenv.config()
 
 const PORT = process.env.PORT || 5000
 

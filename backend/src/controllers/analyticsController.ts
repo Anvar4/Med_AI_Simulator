@@ -4,6 +4,7 @@ import mongoose from 'mongoose'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { PaymentRequest } from '../models/PaymentRequest'
+import { ReferralEarning } from '../models/ReferralEarning'
 import { User } from '../models/User'
 
 /**
@@ -202,6 +203,77 @@ export const getServerHealth = async (_req: Request, res: Response): Promise<voi
           os: `${os.type()} ${os.release()}`,
           arch: os.arch(),
         },
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+/**
+ * Referral program accounting for the admin dashboard: program-wide totals
+ * (referred sign-ups, cash paid out, points granted) and a leaderboard of the
+ * top referrers with how much money/points each earned. All real, from the DB.
+ * GET /api/admin/referrals
+ */
+export const getReferralAnalytics = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const [totals, topAgg] = await Promise.all([
+      ReferralEarning.aggregate([
+        {
+          $group: {
+            _id: null,
+            invitedCount: { $sum: 1 },
+            totalPaid: { $sum: '$amount' },
+            totalPoints: { $sum: '$points' },
+            referrers: { $addToSet: '$referrer' },
+          },
+        },
+      ]),
+      ReferralEarning.aggregate([
+        {
+          $group: {
+            _id: '$referrer',
+            invitedCount: { $sum: 1 },
+            earned: { $sum: '$amount' },
+            points: { $sum: '$points' },
+            lastInviteAt: { $max: '$createdAt' },
+          },
+        },
+        { $sort: { invitedCount: -1, earned: -1 } },
+        { $limit: 50 },
+        {
+          $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u' },
+        },
+        { $unwind: '$u' },
+        {
+          $project: {
+            _id: 0,
+            userId: '$_id',
+            name: '$u.name',
+            username: '$u.username',
+            avatar: '$u.avatar',
+            invitedCount: 1,
+            earned: 1,
+            points: 1,
+            lastInviteAt: 1,
+          },
+        },
+      ]),
+    ])
+
+    const t = totals[0] || { invitedCount: 0, totalPaid: 0, totalPoints: 0, referrers: [] }
+
+    res.json({
+      status: 'success',
+      referrals: {
+        totals: {
+          invitedCount: t.invitedCount,
+          totalPaid: t.totalPaid,
+          totalPoints: t.totalPoints,
+          referrerCount: Array.isArray(t.referrers) ? t.referrers.length : 0,
+        },
+        top: topAgg,
       },
     })
   } catch (error) {

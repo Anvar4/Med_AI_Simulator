@@ -9,6 +9,8 @@ export interface ICaseAttempt extends Document {
   treatment: string
   score: number
   aiFeedback: string
+  strengths: string[]   // AI-identified strengths (kept for history)
+  weaknesses: string[]  // AI-identified weaknesses/gaps (kept for history)
   timeSpent: number // seconds
   completedSteps: number[]
   startedAt: Date
@@ -31,6 +33,8 @@ const caseAttemptSchema = new Schema<ICaseAttempt>(
     treatment: { type: String, default: '' },
     score: { type: Number, default: 0, min: 0, max: 100 },
     aiFeedback: { type: String, default: '' },
+    strengths: { type: [String], default: [] },
+    weaknesses: { type: [String], default: [] },
     timeSpent: { type: Number, default: 0 },
     completedSteps: [Number],
     startedAt: { type: Date, default: Date.now },

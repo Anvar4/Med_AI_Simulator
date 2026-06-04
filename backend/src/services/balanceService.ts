@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import { BalanceTopUp } from '../models/BalanceTopUp'
 import { notify } from '../models/Notification'
+import { ReferralEarning } from '../models/ReferralEarning'
 import { SubscriptionTransaction } from '../models/SubscriptionTransaction'
 import { User } from '../models/User'
 
@@ -16,6 +17,59 @@ export const PLANS = {
 export type PlanId = keyof typeof PLANS
 
 export const MIN_TOPUP = 5000
+
+// Referral reward (per successfully referred sign-up), configurable via env.
+export const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS || 1000)  // so'm
+export const REFERRAL_POINTS = Number(process.env.REFERRAL_POINTS || 5)   // ranking points
+
+/**
+ * Grant the referrer their reward for inviting `invitedUserId`. Idempotent: a
+ * unique ReferralEarning per invited user guarantees the bonus is credited at
+ * most once even under retries/races. Credits balance + points atomically and
+ * fires in-app notifications (sign-up, money, points). Best-effort — failures
+ * never block the invited user's registration.
+ */
+export async function grantReferralReward(
+  referrerId: mongoose.Types.ObjectId | string,
+  invitedUserId: mongoose.Types.ObjectId | string,
+  invitedName: string
+): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    // Claim the reward slot first; the unique index makes this the idempotency gate.
+    try {
+      await ReferralEarning.create({
+        referrer: referrerId,
+        invitedUser: invitedUserId,
+        amount: REFERRAL_BONUS,
+        points: REFERRAL_POINTS,
+      })
+    } catch (err) {
+      // Duplicate key => already rewarded for this invited user. Nothing to do.
+      if ((err as { code?: number }).code === 11000) return { ok: false, reason: 'already_rewarded' }
+      throw err
+    }
+
+    const referrer = await User.findByIdAndUpdate(
+      referrerId,
+      { $inc: { balance: REFERRAL_BONUS, points: REFERRAL_POINTS } },
+      { new: true }
+    )
+    if (!referrer) return { ok: false, reason: 'referrer_not_found' }
+
+    // Three notifications, as requested: new sign-up, money credited, points earned.
+    await notify(referrer._id, 'Yangi taklif qilingan foydalanuvchi',
+      `${invitedName} sizning taklifingiz bilan ro'yxatdan o'tdi. Tabriklaymiz!`, 'info')
+    await notify(referrer._id, 'Referal bonusi balansga tushdi',
+      `Taklif uchun +${REFERRAL_BONUS.toLocaleString()} so'm balansingizga qo'shildi. Joriy balans: ${referrer.balance.toLocaleString()} so'm.`, 'success')
+    await notify(referrer._id, 'Reyting ballari qo\'shildi',
+      `Taklif uchun +${REFERRAL_POINTS} ball oldingiz. Jami ballaringiz: ${referrer.points}.`, 'success')
+
+    return { ok: true }
+  } catch (error) {
+    console.error('grantReferralReward error:', error)
+    return { ok: false, reason: 'error' }
+  }
+}
 
 /**
  * Approve a pending top-up and credit the user's balance — idempotent.

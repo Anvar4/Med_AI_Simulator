@@ -183,6 +183,8 @@ export const submitAttempt = async (req: AuthRequest, res: Response): Promise<vo
     attempt.timeSpent = timeSpent
     attempt.score = aiResult.score
     attempt.aiFeedback = aiResult.feedback
+    attempt.strengths = aiResult.strengths
+    attempt.weaknesses = aiResult.weaknesses
     attempt.status = 'completed'
     attempt.completedAt = new Date()
     await attempt.save()
@@ -218,9 +220,17 @@ export const getMyAttempts = async (req: AuthRequest, res: Response): Promise<vo
     const pageNum = Math.max(1, parseInt(page as string))
     const limitNum = Math.min(50, Math.max(1, parseInt(limit as string)))
 
+    // The correct answer may only be revealed for already-completed attempts
+    // (used in the history page for learning). For any other status (e.g.
+    // in-progress) keep it hidden so the simulator can't be cheated.
+    const revealAnswer = status === 'completed'
+    const caseFields = revealAnswer
+      ? 'caseId title category difficulty type correctDiagnosis correctTreatment'
+      : 'caseId title category difficulty type'
+
     const [attempts, total] = await Promise.all([
       CaseAttempt.find(filter)
-        .populate('case', 'caseId title category difficulty type')
+        .populate('case', caseFields)
         .sort({ createdAt: -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum),

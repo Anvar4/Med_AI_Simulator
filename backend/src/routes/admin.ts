@@ -19,7 +19,7 @@ import {
     updateCategory,
     updateUser,
 } from '../controllers/adminController'
-import { getCaseStats, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
+import { getCaseStats, getReferralAnalytics, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
 import {
     approveTopUpAdmin,
     createCard,
@@ -48,6 +48,7 @@ router.get('/analytics', getAdminAnalytics)
 router.get('/revenue', getRevenueAnalytics)
 router.get('/server-health', getServerHealth)
 router.get('/case-stats', getCaseStats)
+router.get('/referrals', getReferralAnalytics)
 
 router.get('/users', getUsers)
 router.get('/users/:id', getUserById)

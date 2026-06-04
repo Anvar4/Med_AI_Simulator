@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../middleware/auth';
 import { OTP } from '../models/OTP';
 import { User } from '../models/User';
+import { grantReferralReward } from '../services/balanceService';
 import { sendOTPEmail } from '../services/emailService';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -195,22 +196,14 @@ export const completeRegister = async (req: Request, res: Response): Promise<voi
       avatar: avatar || undefined,
     })
 
-    // Process referral code if provided
+    // Process referral code if provided: link the invited user to the referrer
+    // and grant the cash + points reward (idempotent, never blocks sign-up).
     const { referralCode } = req.body as { referralCode?: string }
     if (referralCode) {
       const referrer = await User.findOne({ referralCode: referralCode.toUpperCase().trim() })
       if (referrer && !referrer._id.equals(user._id)) {
         await User.findByIdAndUpdate(user._id, { referredBy: referrer._id })
-        const now = new Date()
-        const discountExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
-        // Give referrer 2% discount if no active discount or existing is lower
-        const existingDiscount = referrer.discount
-        const hasActiveDiscount = existingDiscount && existingDiscount.expiresAt > now
-        if (!hasActiveDiscount || existingDiscount.percent < 2) {
-          await User.findByIdAndUpdate(referrer._id, {
-            discount: { percent: 2, expiresAt: discountExpiresAt },
-          })
-        }
+        await grantReferralReward(referrer._id, user._id, user.name)
       }
     }
 

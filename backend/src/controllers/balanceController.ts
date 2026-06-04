@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth'
 import { BalanceTopUp } from '../models/BalanceTopUp'
 import { Notification, notify } from '../models/Notification'
 import { PaymentCard } from '../models/PaymentCard'
+import { SubscriptionTransaction } from '../models/SubscriptionTransaction'
 import { User } from '../models/User'
 import { buySubscriptionFromBalance, MIN_TOPUP, PLANS, PlanId } from '../services/balanceService'
 import { notifyAdminsOfTopUp } from '../services/telegramBot'
@@ -23,11 +24,12 @@ export const getActiveCards = async (_req: AuthRequest, res: Response): Promise<
 // GET /api/balance/me — current balance + subscription snapshot
 export const getMyBalance = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.user!._id).select('balance subscription isPremium')
+    const user = await User.findById(req.user!._id).select('balance points subscription isPremium')
     if (!user) { res.status(404).json({ message: 'Foydalanuvchi topilmadi' }); return }
     res.json({
       status: 'success',
       balance: user.balance ?? 0,
+      points: user.points ?? 0,
       isPremium: user.isPremium,
       subscription: user.subscription,
       prices: { monthly: PLANS.monthly.price(), yearly: PLANS.yearly.price(), yearlyOld: Number(process.env.PRICE_YEARLY_OLD || 720000) },
@@ -83,6 +85,19 @@ export const getMyTopUps = async (req: AuthRequest, res: Response): Promise<void
       .sort({ createdAt: -1 })
       .limit(50)
     res.json({ status: 'success', topups })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// GET /api/balance/subscriptions — the user's own subscription purchase history
+export const getMySubscriptions = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const transactions = await SubscriptionTransaction.find({ user: req.user!._id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .select('plan amount status balanceBefore balanceAfter startedAt expiresAt createdAt')
+    res.json({ status: 'success', transactions })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }

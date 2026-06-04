@@ -1,8 +1,8 @@
+import './loadEnv'; // MUST be first — loads .env before route modules read process.env
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
 import cors from 'cors';
-import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -17,13 +17,12 @@ import chatRoutes from './routes/chat';
 import courseRoutes from './routes/courses';
 import learningRoutes from './routes/learning';
 import paymentRoutes from './routes/payments';
+import referralRoutes from './routes/referrals';
 import sttRoutes from './routes/stt';
 import statsRoutes from './routes/stats';
 import subscriptionRoutes from './routes/subscriptions';
 import ttsRoutes from './routes/tts';
 import uploadRoutes from './routes/upload';
-
-dotenv.config()
 
 const FALLBACK_ORIGINS = [
   'http://localhost:3000',
@@ -107,6 +106,7 @@ app.use('/api/chat', chatRoutes)
 app.use('/api/courses', courseRoutes)
 app.use('/api/learning', learningRoutes)
 app.use('/api/payments', paymentRoutes)
+app.use('/api/referrals', referralRoutes)
 
 app.get('/api/health', (_req, res) => {
   res.json({
