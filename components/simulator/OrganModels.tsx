@@ -29,15 +29,29 @@ export function OrganPart({ partId, color, selectedPart, onSelect, children }: P
   const isSelected = selectedPart === partId
   const emphasis = isSelected || hovered
 
-  // Shared material so all child meshes in this part look consistent.
-  const material = useMemo(() => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color),
-    roughness: 0.55,
-    metalness: 0.05,
-  }), [color])
+  // Physically-based "living tissue" material: damp specular sheen + a thin
+  // clear coat for the wet organ surface, slight translucency for a fleshy look.
+  const material = useMemo(() => {
+    const m = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color),
+      roughness: 0.42,
+      metalness: 0.0,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.35,
+      sheen: 0.5,
+      sheenColor: new THREE.Color('#ff6b6b'),
+      sheenRoughness: 0.6,
+      specularIntensity: 0.6,
+      // a touch of transmission gives the soft, sub-surface fleshy feel
+      transmission: 0.06,
+      thickness: 0.8,
+      ior: 1.38,
+    })
+    return m
+  }, [color])
 
-  material.emissive = new THREE.Color(isSelected ? '#2f80ed' : hovered ? color : '#000000')
-  material.emissiveIntensity = isSelected ? 0.5 : hovered ? 0.35 : 0
+  material.emissive = new THREE.Color(isSelected ? '#2f80ed' : hovered ? color : '#1a0505')
+  material.emissiveIntensity = isSelected ? 0.45 : hovered ? 0.3 : 0.06
 
   return (
     <group
@@ -73,37 +87,86 @@ function M({ geometry, position, rotation, scale }: {
 
 type ModelProps = { selectedPart: string | null; onSelect: (id: string) => void }
 
-// Reusable geometries (memoized at module level via factory in components).
-function sphere(r: number, seg = 32) { return new THREE.SphereGeometry(r, seg, seg) }
-function capsule(r: number, len: number) { return new THREE.CapsuleGeometry(r, len, 8, 24) }
-function cylinder(rt: number, rb: number, h: number) { return new THREE.CylinderGeometry(rt, rb, h, 24) }
+// Reusable geometries. Organic spheres get high segment counts plus a gentle
+// pseudo-noise displacement so the surface looks soft and irregular, not a
+// perfect ball. Normals are recomputed so lighting stays correct.
+function organicSphere(r: number, amount = 0.06, seg = 64): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(r, seg, seg)
+  const pos = geo.attributes.position
+  const v = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i)
+    const n = v.clone().normalize()
+    // layered sine noise -> lumpy organic surface
+    const d =
+      Math.sin(n.x * 6 + n.y * 4) * 0.5 +
+      Math.sin(n.y * 8 + n.z * 5) * 0.3 +
+      Math.sin(n.z * 7 + n.x * 6) * 0.2
+    v.addScaledVector(n, d * amount * r)
+    pos.setXYZ(i, v.x, v.y, v.z)
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+function capsule(r: number, len: number) { return new THREE.CapsuleGeometry(r, len, 16, 32) }
+function cylinder(rt: number, rb: number, h: number) { return new THREE.CylinderGeometry(rt, rb, h, 32) }
+function tube(path: THREE.Curve<THREE.Vector3>, r: number) { return new THREE.TubeGeometry(path, 24, r, 12, false) }
 
 // ─── HEART ─────────────────────────────────────────────────────
 export function HeartModel({ selectedPart, onSelect }: ModelProps) {
-  const g = useMemo(() => ({
-    chamber: sphere(0.62),
-    chamberSm: sphere(0.5),
-    atrium: sphere(0.4),
-    aorta: cylinder(0.16, 0.2, 1.1),
-    aortaArch: new THREE.TorusGeometry(0.28, 0.13, 16, 24, Math.PI),
-  }), [])
+  const g = useMemo(() => {
+    // Aortic arch: a curved tube rising and bending over the top.
+    const archCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.05, 0.55, 0),
+      new THREE.Vector3(0.05, 1.0, -0.05),
+      new THREE.Vector3(-0.1, 1.35, -0.1),
+      new THREE.Vector3(-0.45, 1.4, -0.1),
+      new THREE.Vector3(-0.7, 1.15, -0.05),
+    ])
+    // Pulmonary trunk: shorter curved vessel.
+    const pulmCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.3, 0.5, 0.15),
+      new THREE.Vector3(0.35, 0.95, 0.1),
+      new THREE.Vector3(0.2, 1.25, 0),
+    ])
+    // Great-vessel branches off the arch.
+    const branch = (x: number) => new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x, 1.38, -0.1),
+      new THREE.Vector3(x, 1.7, -0.05),
+    ])
+    return {
+      ventricleL: organicSphere(0.62, 0.07),
+      ventricleR: organicSphere(0.52, 0.07),
+      atriumL: organicSphere(0.4, 0.08),
+      atriumR: organicSphere(0.42, 0.08),
+      aorta: tube(archCurve, 0.15),
+      pulmonary: tube(pulmCurve, 0.14),
+      branch1: tube(branch(-0.55), 0.05),
+      branch2: tube(branch(-0.35), 0.05),
+      branch3: tube(branch(-0.15), 0.05),
+    }
+  }, [])
   return (
-    <group scale={1.1}>
-      <OrganPart partId='left-ventricle' color='#b3322f' selectedPart={selectedPart} onSelect={onSelect}>
-        <M geometry={g.chamber} position={[-0.25, -0.35, 0]} scale={[1, 1.25, 1]} />
+    <group scale={1.05} rotation={[0, 0, 0.05]}>
+      {/* Left ventricle forms the apex (bottom point) of the heart */}
+      <OrganPart partId='left-ventricle' color='#8e2d2a' selectedPart={selectedPart} onSelect={onSelect}>
+        <M geometry={g.ventricleL} position={[-0.18, -0.35, 0]} scale={[1.05, 1.45, 1.05]} rotation={[0, 0, 0.12]} />
       </OrganPart>
-      <OrganPart partId='right-ventricle' color='#c25450' selectedPart={selectedPart} onSelect={onSelect}>
-        <M geometry={g.chamberSm} position={[0.35, -0.3, 0.1]} scale={[1, 1.15, 1]} />
+      <OrganPart partId='right-ventricle' color='#a83e38' selectedPart={selectedPart} onSelect={onSelect}>
+        <M geometry={g.ventricleR} position={[0.32, -0.28, 0.12]} scale={[1.05, 1.3, 1.0]} rotation={[0, 0, -0.1]} />
       </OrganPart>
-      <OrganPart partId='left-atrium' color='#9c4a6e' selectedPart={selectedPart} onSelect={onSelect}>
-        <M geometry={g.atrium} position={[-0.32, 0.45, -0.1]} />
+      <OrganPart partId='left-atrium' color='#7d3a52' selectedPart={selectedPart} onSelect={onSelect}>
+        <M geometry={g.atriumL} position={[-0.34, 0.42, -0.12]} scale={[1, 0.9, 1]} />
       </OrganPart>
-      <OrganPart partId='right-atrium' color='#a85d57' selectedPart={selectedPart} onSelect={onSelect}>
-        <M geometry={g.atrium} position={[0.4, 0.42, 0]} scale={0.95} />
+      <OrganPart partId='right-atrium' color='#9c4a44' selectedPart={selectedPart} onSelect={onSelect}>
+        <M geometry={g.atriumR} position={[0.4, 0.4, 0.02]} scale={[1, 0.92, 1]} />
       </OrganPart>
-      <OrganPart partId='aorta' color='#d98880' selectedPart={selectedPart} onSelect={onSelect}>
-        <M geometry={g.aorta} position={[0, 0.85, -0.05]} />
-        <M geometry={g.aortaArch} position={[-0.28, 1.25, -0.05]} rotation={[0, 0, -0.2]} />
+      <OrganPart partId='aorta' color='#c96a5e' selectedPart={selectedPart} onSelect={onSelect}>
+        <M geometry={g.aorta} />
+        <M geometry={g.pulmonary} />
+        <M geometry={g.branch1} />
+        <M geometry={g.branch2} />
+        <M geometry={g.branch3} />
       </OrganPart>
     </group>
   )
@@ -112,7 +175,7 @@ export function HeartModel({ selectedPart, onSelect }: ModelProps) {
 // ─── LUNGS ─────────────────────────────────────────────────────
 export function LungsModel({ selectedPart, onSelect }: ModelProps) {
   const g = useMemo(() => ({
-    lung: sphere(0.62),
+    lung: organicSphere(0.62, 0.05),
     trachea: cylinder(0.1, 0.1, 0.7),
     bronchus: cylinder(0.06, 0.07, 0.45),
   }), [])
@@ -138,8 +201,8 @@ export function LungsModel({ selectedPart, onSelect }: ModelProps) {
 // ─── LIVER ─────────────────────────────────────────────────────
 export function LiverModel({ selectedPart, onSelect }: ModelProps) {
   const g = useMemo(() => ({
-    rightLobe: sphere(0.8),
-    leftLobe: sphere(0.55),
+    rightLobe: organicSphere(0.8, 0.05),
+    leftLobe: organicSphere(0.55, 0.05),
     gallbladder: capsule(0.13, 0.22),
   }), [])
   return (
@@ -161,8 +224,8 @@ export function LiverModel({ selectedPart, onSelect }: ModelProps) {
 export function KidneyModel({ selectedPart, onSelect }: ModelProps) {
   // bean shape from two overlapping ellipsoids minus indent (approximated)
   const g = useMemo(() => ({
-    cortex: sphere(0.7),
-    medulla: sphere(0.5),
+    cortex: organicSphere(0.7, 0.04),
+    medulla: organicSphere(0.5, 0.04),
     pelvis: capsule(0.1, 0.3),
   }), [])
   return (
@@ -184,8 +247,9 @@ export function KidneyModel({ selectedPart, onSelect }: ModelProps) {
 // ─── BRAIN ─────────────────────────────────────────────────────
 export function BrainModel({ selectedPart, onSelect }: ModelProps) {
   const g = useMemo(() => ({
-    hemi: sphere(0.62, 48),
-    cerebellum: sphere(0.32),
+    // Brain gets stronger noise to suggest gyri/sulci (folds).
+    hemi: organicSphere(0.62, 0.12),
+    cerebellum: organicSphere(0.32, 0.14),
     stem: cylinder(0.12, 0.16, 0.6),
   }), [])
   return (
@@ -207,7 +271,7 @@ export function BrainModel({ selectedPart, onSelect }: ModelProps) {
 // ─── STOMACH ───────────────────────────────────────────────────
 export function StomachModel({ selectedPart, onSelect }: ModelProps) {
   const g = useMemo(() => ({
-    fundus: sphere(0.45),
+    fundus: organicSphere(0.45, 0.05),
     body: capsule(0.42, 0.5),
     pylorus: cylinder(0.12, 0.18, 0.4),
   }), [])
@@ -229,7 +293,7 @@ export function StomachModel({ selectedPart, onSelect }: ModelProps) {
 // ─── THYROID ───────────────────────────────────────────────────
 export function ThyroidModel({ selectedPart, onSelect }: ModelProps) {
   const g = useMemo(() => ({
-    lobe: sphere(0.4),
+    lobe: organicSphere(0.4, 0.04),
     isthmus: capsule(0.12, 0.25),
   }), [])
   return (
