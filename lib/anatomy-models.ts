@@ -47,12 +47,24 @@ const EMBED_PARAMS: Record<string, string> = {
   ui_settings: '0',
   ui_vr: '0',
   ui_fullscreen: '0',
-  ui_annotations: '0',
   ui_inspector: '0',
   ui_theme: 'dark',
   dnt: '1',
   scrollwheel: '1',
+  // Hide annotations (the numbered hotspots + english labels). The panel flag
+  // (ui_annotations) is not always enough, so also disable the 3D annotation
+  // markers via the documented flags; the API call in the viewer is the final
+  // guarantee.
+  ui_annotations: '0',
+  annotation: '0',
+  annotations_visible: '0',
+  annotation_tooltip_visible: '0',
 }
+
+// Sketchfab Viewer API script (loaded once) lets us programmatically turn off
+// annotations after the model finishes loading — the only reliable way to hide
+// the 3D hotspot markers for models we don't own.
+export const SKETCHFAB_API_SRC = 'https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js'
 
 /** Build a cleaned embed URL with the UI-suppressing query params appended. */
 export function buildEmbedSrc(embedUrl: string): string {
