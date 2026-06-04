@@ -1,11 +1,20 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Box, ChevronRight, Search, X } from 'lucide-react'
+import { Box, ChevronRight, Lock, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useT } from '@/lib/language-context'
+import { useAuth } from '@/lib/auth-context'
 import type { Locale } from '@/lib/i18n'
 import { ANATOMY_CATEGORIES, ANATOMY_MODELS, tl } from '@/lib/anatomy-models'
+
+// Free users may open only the first N models; the rest require Pro.
+export const FREE_MODEL_LIMIT = 3
+const FREE_MODEL_IDS = new Set(ANATOMY_MODELS.slice(0, FREE_MODEL_LIMIT).map(m => m.id))
+
+export function isModelLocked(id: string, isPremium: boolean): boolean {
+  return !isPremium && !FREE_MODEL_IDS.has(id)
+}
 
 interface ControlsPanelProps {
   selectedId: string
@@ -14,6 +23,8 @@ interface ControlsPanelProps {
 
 export default function ControlsPanel({ selectedId, onSelect }: ControlsPanelProps) {
   const { locale, t } = useT()
+  const { user } = useAuth()
+  const isPremium = !!user?.isPremium || user?.role === 'admin' || user?.role === 'content-manager'
   const lc = locale as Locale
   const [search, setSearch] = useState('')
   // category stored as the English canonical value ('All' or model.category)
@@ -90,6 +101,7 @@ export default function ControlsPanel({ selectedId, onSelect }: ControlsPanelPro
         ) : (
           filtered.map(model => {
             const isActive = selectedId === model.id
+            const locked = isModelLocked(model.id, isPremium)
             return (
               <motion.button
                 key={model.id}
@@ -97,18 +109,20 @@ export default function ControlsPanel({ selectedId, onSelect }: ControlsPanelPro
                 onClick={() => onSelect(model.id)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-left border transition-all duration-200 ${
                   isActive ? 'bg-primary/10 border-primary/30' : 'bg-surface-light border-transparent hover:border-border'
-                }`}
+                } ${locked ? 'opacity-70' : ''}`}
               >
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                   isActive ? 'bg-primary/20 text-primary' : 'bg-surface text-text-secondary'
                 }`}>
-                  <Box className='w-4 h-4' />
+                  {locked ? <Lock className='w-3.5 h-3.5 text-warning' /> : <Box className='w-4 h-4' />}
                 </div>
                 <div className='min-w-0 flex-1'>
                   <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-text-primary'}`}>
                     {tl(model.title, lc)}
                   </p>
-                  <p className='text-[10px] text-text-secondary'>{model.parts.length} {t('simulator.parts')}</p>
+                  <p className='text-[10px] text-text-secondary'>
+                    {locked ? <span className='text-warning font-semibold'>Pro</span> : `${model.parts.length} ${t('simulator.parts')}`}
+                  </p>
                 </div>
                 <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-primary' : 'text-text-secondary'}`} />
               </motion.button>

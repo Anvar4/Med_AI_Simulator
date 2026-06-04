@@ -89,16 +89,47 @@ export const startAttempt = async (req: AuthRequest, res: Response): Promise<voi
       }
     }
 
-    // Check if user already has an in-progress attempt
+    // A case may be solved only once: a completed attempt blocks re-doing it.
+    const completedSame = await CaseAttempt.findOne({
+      user: req.user!._id,
+      case: caseData._id,
+      status: 'completed',
+    })
+    if (completedSame && !isStaff) {
+      res.status(403).json({
+        message: 'Bu klinik holatni allaqachon yechgansiz. Har bir holat faqat bir marta ishlanadi.',
+        alreadyCompleted: true,
+      })
+      return
+    }
+
+    // Resume an in-progress attempt for this exact case.
     const existing = await CaseAttempt.findOne({
       user: req.user!._id,
       case: caseData._id,
       status: 'in-progress',
     })
-
     if (existing) {
       res.json({ status: 'success', attempt: existing, message: 'Davom ettirilmoqda' })
       return
+    }
+
+    // Daily limit for free (non-premium, non-staff) users: 1 new case per day.
+    if (!req.user!.isPremium && !isStaff) {
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const startedToday = await CaseAttempt.countDocuments({
+        user: req.user!._id,
+        createdAt: { $gte: startOfDay },
+      })
+      if (startedToday >= 1) {
+        res.status(403).json({
+          message: 'Bepul rejada kuniga 1 ta klinik holat ishlash mumkin. Cheksiz uchun Pro obunani faollashtiring.',
+          dailyLimitReached: true,
+          premiumRequired: true,
+        })
+        return
+      }
     }
 
     const attempt = await CaseAttempt.create({

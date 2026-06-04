@@ -2,6 +2,7 @@ import { Response } from 'express'
 import OpenAI from 'openai'
 import { AuthRequest } from '../middleware/auth'
 import { CaseAttempt } from '../models/CaseAttempt'
+import { User } from '../models/User'
 
 let _openai: OpenAI | null = null
 const getOpenAI = () => {
@@ -19,6 +20,30 @@ QOIDALAR:
 - Tibbiy maslahat bering, lekin "shifokorga murojaat qiling" eslatmasini ham qo'shing.
 - Qisqa va aniq javob bering.`
 
+const FREE_CHAT_LIMIT = 5
+
+/**
+ * Enforce a per-day chat limit for free (non-premium) users. Returns true if the
+ * request may proceed, false if the limit is reached (response already sent).
+ * Increments the counter on success.
+ */
+async function checkChatLimit(req: AuthRequest, res: Response): Promise<boolean> {
+  const user = req.user!
+  if (user.isPremium || user.role === 'admin' || user.role === 'instructor') return true
+  const today = new Date().toISOString().slice(0, 10)
+  const usage = user.chatUsage && user.chatUsage.date === today ? user.chatUsage : { date: today, count: 0 }
+  if (usage.count >= FREE_CHAT_LIMIT) {
+    res.status(403).json({
+      message: `Bepul rejada kuniga ${FREE_CHAT_LIMIT} ta savol berish mumkin. Cheksiz uchun Pro obunani faollashtiring.`,
+      chatLimitReached: true,
+      premiumRequired: true,
+    })
+    return false
+  }
+  await User.findByIdAndUpdate(user._id, { chatUsage: { date: today, count: usage.count + 1 } })
+  return true
+}
+
 // ─── General floating chatbot ──────────────────────────────────
 export const chatMessage = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -30,6 +55,8 @@ export const chatMessage = async (req: AuthRequest, res: Response): Promise<void
       res.status(400).json({ message: 'Xabarlar kerak' })
       return
     }
+
+    if (!(await checkChatLimit(req, res))) return
 
     const completion = await getOpenAI().chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -59,6 +86,8 @@ export const analysisChatMessage = async (req: AuthRequest, res: Response): Prom
       res.status(400).json({ message: 'Xabarlar kerak' })
       return
     }
+
+    if (!(await checkChatLimit(req, res))) return
 
     // Gather user stats for context
     const userId = req.user!._id

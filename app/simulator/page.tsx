@@ -1,18 +1,22 @@
 'use client'
 
 import Sidebar from '@/components/layout/Sidebar'
-import ControlsPanel from '@/components/simulator/ControlsPanel'
+import ControlsPanel, { isModelLocked } from '@/components/simulator/ControlsPanel'
 import SketchfabViewer from '@/components/simulator/SketchfabViewer'
+import { useAuth } from '@/lib/auth-context'
 import { useT } from '@/lib/language-context'
 import type { Locale } from '@/lib/i18n'
 import { ANATOMY_MODELS, tl } from '@/lib/anatomy-models'
 import { useTTS } from '@/lib/use-tts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, Info, Layers, List, Loader2, Maximize2, Volume2, VolumeX, X } from 'lucide-react'
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Info, Layers, List, Loader2, Lock, Maximize2, Volume2, VolumeX, X } from 'lucide-react'
+import Link from 'next/link'
 import { useCallback, useState } from 'react'
 
 export default function SimulatorPage() {
   const { locale, t } = useT()
+  const { user } = useAuth()
+  const isPremium = !!user?.isPremium || user?.role === 'admin' || user?.role === 'content-manager'
   const lc = locale as Locale
   const [selectedId, setSelectedId] = useState(ANATOMY_MODELS[0].id)
   const [panelOpen, setPanelOpen] = useState(true)        // desktop: model list
@@ -21,6 +25,7 @@ export default function SimulatorPage() {
 
   const model = ANATOMY_MODELS.find(m => m.id === selectedId) ?? ANATOMY_MODELS[0]
   const modelTitle = tl(model.title, lc)
+  const locked = isModelLocked(model.id, isPremium)
   const tts = useTTS(lc as 'uz' | 'ru' | 'en')
 
   // Read the model title + description + parts aloud in the current language.
@@ -103,7 +108,22 @@ export default function SimulatorPage() {
 
           {/* 3D Viewer */}
           <div id='viewer-container' className='flex-1 relative bg-secondary overflow-hidden'>
-            <SketchfabViewer embedUrl={model.embedUrl} title={modelTitle} className='w-full h-full' />
+            {locked ? (
+              <div className='absolute inset-0 flex flex-col items-center justify-center p-6 text-center'>
+                <div className='w-16 h-16 rounded-2xl bg-warning/15 text-warning flex items-center justify-center mb-4'>
+                  <Lock className='w-8 h-8' />
+                </div>
+                <h3 className='text-lg font-bold text-text-primary mb-2'>Bu model Pro obuna uchun</h3>
+                <p className='text-sm text-text-secondary max-w-sm mb-5'>
+                  Bepul rejada dastlabki 3 ta 3D model ochiq. Barcha {ANATOMY_MODELS.length} modelni ko&apos;rish uchun Pro obunani faollashtiring.
+                </p>
+                <Link href='/subscription' className='px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold'>
+                  Pro obunani faollashtirish
+                </Link>
+              </div>
+            ) : (
+              <SketchfabViewer embedUrl={model.embedUrl} title={modelTitle} className='w-full h-full' />
+            )}
 
             {/* Model badge */}
             <div className='absolute top-3 left-3 z-30 pointer-events-none'>
