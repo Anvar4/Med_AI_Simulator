@@ -50,20 +50,21 @@ export default function SimulatorPage() {
             </div>
           </div>
 
-          <div className='flex items-center gap-1 shrink-0'>
-            {/* Mobile: open model list */}
+          <div className='flex items-center gap-1.5 shrink-0'>
+            {/* Mobile: open model list — primary action, labelled so it's obvious */}
             <button onClick={() => setMobilePicker(true)}
-              className='lg:hidden p-2 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all'
-              title='Modellar'>
+              className='lg:hidden inline-flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold transition-all active:scale-95'
+              title={t('simulator.modelList')}>
               <List className='w-4 h-4' />
+              <span>{t('simulator.models')}</span>
             </button>
             <button onClick={() => setInfoOpen(!infoOpen)}
               className={`p-2 rounded-xl transition-all duration-200 ${infoOpen ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-surface-light hover:text-text-primary'}`}
-              title="Ma'lumot">
+              title={t('simulator.containedParts')}>
               <Info className='w-4 h-4' />
             </button>
             <button onClick={handleFullscreen}
-              className='p-2 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all'
+              className='hidden sm:flex p-2 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all'
               title="To'liq ekran">
               <Maximize2 className='w-4 h-4' />
             </button>
