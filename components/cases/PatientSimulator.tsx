@@ -1,6 +1,9 @@
 'use client'
 
+import { useT } from '@/lib/language-context';
+import { useTTS } from '@/lib/use-tts';
 import { motion } from 'framer-motion';
+import { Loader2, Volume2, VolumeX } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 
@@ -23,9 +26,14 @@ export default function PatientSimulator({
 }: PatientSimulatorProps) {
 	const fullText = `Assalomu alaykum, doktor. Mening ismim ${patientName}, yoshim ${age}da${gender === 'Ayol' ? 'man' : 'man'}. ${complaints}. ${history}.`
 
+	const { locale } = useT()
+	const patientTts = useTTS(locale as 'uz' | 'ru' | 'en')
+	const patientGender = gender === 'Ayol' ? 'female' : 'male'
+
 	const [displayedText, setDisplayedText] = useState('')
 	const [isTypingDone, setIsTypingDone] = useState(false)
 	const charIndexRef = useRef(0)
+	const spokenRef = useRef(false)
 
 	// Typing effect
 	useEffect(() => {
@@ -43,6 +51,22 @@ export default function PatientSimulator({
 
 		return () => clearInterval(interval)
 	}, [fullText])
+
+	// Speak the patient's words once the typing finishes (gender-matched voice).
+	useEffect(() => {
+		if (isTypingDone && !spokenRef.current) {
+			spokenRef.current = true
+			patientTts.speak(fullText, patientGender)
+		}
+	}, [isTypingDone, fullText, patientGender, patientTts])
+
+	// Reset the "spoken" guard when the patient (text) changes.
+	useEffect(() => { spokenRef.current = false }, [fullText])
+
+	const toggleSpeak = () => {
+		if (patientTts.speaking || patientTts.loading) patientTts.stop()
+		else patientTts.speak(fullText, patientGender)
+	}
 
 	const defaultAvatar = gender === 'Ayol' ? '/female.png' : '/male.png'
 
@@ -131,9 +155,15 @@ export default function PatientSimulator({
 						{/* Triangle pointer */}
 						<div className='hidden sm:block absolute left-0 top-8 -translate-x-2 w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-white/10' />
 
-						<p className='text-sm text-white/60 mb-1 font-medium'>
-							{patientName}, {age} yosh
-						</p>
+						<div className='flex items-center justify-between mb-1'>
+							<p className='text-sm text-white/60 font-medium'>
+								{patientName}, {age} yosh
+							</p>
+							<button onClick={toggleSpeak} title='Ovozli o&apos;qish'
+								className='shrink-0 p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors'>
+								{patientTts.loading ? <Loader2 className='w-4 h-4 animate-spin' /> : patientTts.speaking ? <VolumeX className='w-4 h-4' /> : <Volume2 className='w-4 h-4' />}
+							</button>
+						</div>
 
 						<p className='text-white text-sm sm:text-base leading-relaxed min-h-15'>
 							{displayedText}

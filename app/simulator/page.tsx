@@ -6,8 +6,9 @@ import SketchfabViewer from '@/components/simulator/SketchfabViewer'
 import { useT } from '@/lib/language-context'
 import type { Locale } from '@/lib/i18n'
 import { ANATOMY_MODELS, tl } from '@/lib/anatomy-models'
+import { useTTS } from '@/lib/use-tts'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, Info, Layers, List, Maximize2, X } from 'lucide-react'
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Info, Layers, List, Loader2, Maximize2, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 export default function SimulatorPage() {
@@ -20,6 +21,14 @@ export default function SimulatorPage() {
 
   const model = ANATOMY_MODELS.find(m => m.id === selectedId) ?? ANATOMY_MODELS[0]
   const modelTitle = tl(model.title, lc)
+  const tts = useTTS(lc as 'uz' | 'ru' | 'en')
+
+  // Read the model title + description + parts aloud in the current language.
+  const readAloud = useCallback(() => {
+    if (tts.speaking || tts.loading) { tts.stop(); return }
+    const parts = model.parts.map(p => tl(p, lc)).join(', ')
+    tts.speak(`${modelTitle}. ${tl(model.description, lc)}. ${t('simulator.containedParts')}: ${parts}.`)
+  }, [tts, model, lc, modelTitle, t])
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id)
@@ -116,6 +125,10 @@ export default function SimulatorPage() {
                   <div className='flex items-center gap-2 px-4 py-3 border-b border-border shrink-0'>
                     <Layers className='w-4 h-4 text-primary shrink-0' />
                     <h3 className='text-sm font-bold text-text-primary flex-1 truncate'>{modelTitle}</h3>
+                    <button onClick={readAloud} title='Ovozli o&apos;qish'
+                      className={`shrink-0 transition-colors ${tts.speaking ? 'text-primary' : 'text-text-secondary hover:text-primary'}`}>
+                      {tts.loading ? <Loader2 className='w-4 h-4 animate-spin' /> : tts.speaking ? <VolumeX className='w-4 h-4' /> : <Volume2 className='w-4 h-4' />}
+                    </button>
                     <button onClick={() => setInfoOpen(false)} className='text-text-secondary hover:text-text-primary'>
                       <X className='w-4 h-4' />
                     </button>

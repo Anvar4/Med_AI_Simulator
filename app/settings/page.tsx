@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
 import { Locale } from '@/lib/i18n';
+import { useTtsEnabled } from '@/lib/use-tts';
 import { useTheme } from '@/lib/theme-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -73,6 +74,7 @@ export default function SettingsPage() {
 	const { user, updateUser } = useAuth()
 	const { theme, setTheme } = useTheme()
 	const { setLocale } = useT()
+	const [ttsEnabled, setTtsEnabled] = useTtsEnabled()
 	const router = useRouter()
 
 	// Profile
@@ -586,6 +588,17 @@ export default function SettingsPage() {
 										<Toggle enabled={preferences[key] as boolean} onChange={val => handlePreferenceChange(key, val)} />
 									</div>
 								))}
+								{/* Voice reading (TTS) toggle — stored in localStorage via useTtsEnabled */}
+								<div className='flex items-center justify-between p-3 bg-surface-light rounded-xl'>
+									<div className='flex items-center gap-3'>
+										<Volume2 className='w-4 h-4 text-text-secondary' />
+										<div>
+											<p className='text-sm font-medium text-text-primary'>Ovozli o&apos;qish (TTS)</p>
+											<p className='text-[11px] text-text-secondary'>Tavsif, bemor va chat javoblarini ovoz bilan o&apos;qiydi</p>
+										</div>
+									</div>
+									<Toggle enabled={ttsEnabled} onChange={setTtsEnabled} />
+								</div>
 								{/* <div className='flex items-center justify-between p-3 bg-surface-light rounded-xl'>
 									<div className='flex items-center gap-3'>
 										<Globe className='w-4 h-4 text-text-secondary' />

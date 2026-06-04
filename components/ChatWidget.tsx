@@ -3,9 +3,11 @@
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Loader2, Mic, MessageCircle, Send, Square, X } from 'lucide-react'
+import { Loader2, Mic, MessageCircle, Send, Square, Volume2, VolumeX, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useVoiceInput } from '@/lib/use-voice-input'
+import { useTTS } from '@/lib/use-tts'
+import { useT } from '@/lib/language-context'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -24,7 +26,18 @@ export default function ChatWidget() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const voice = useVoiceInput('uz')
+  const { locale } = useT()
+  const voice = useVoiceInput(locale as 'uz' | 'ru' | 'en')
+  const tts = useTTS(locale as 'uz' | 'ru' | 'en')
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null)
+
+  function readMessage(idx: number, content: string) {
+    if (speakingIdx === idx && (tts.speaking || tts.loading)) { tts.stop(); setSpeakingIdx(null); return }
+    setSpeakingIdx(idx)
+    // strip basic markdown so the voice reads clean text
+    const clean = content.replace(/[#*_`>\-]/g, ' ').replace(/\s+/g, ' ').trim()
+    tts.speak(clean)
+  }
 
   async function handleMic() {
     if (voice.state === 'recording') {
@@ -149,6 +162,19 @@ export default function ChatWidget() {
                       >
                         {msg.content}
                       </ReactMarkdown>
+                    )}
+                    {/* Read-aloud button for AI replies (skip the welcome line) */}
+                    {msg.role === 'assistant' && msg.content !== WELCOME && (
+                      <button
+                        onClick={() => readMessage(i, msg.content)}
+                        title='Ovozli o&apos;qish'
+                        className='mt-1.5 inline-flex items-center gap-1 text-[11px] text-text-secondary hover:text-primary transition-colors'
+                      >
+                        {speakingIdx === i && tts.loading ? <Loader2 className='w-3.5 h-3.5 animate-spin' />
+                          : speakingIdx === i && tts.speaking ? <VolumeX className='w-3.5 h-3.5' />
+                            : <Volume2 className='w-3.5 h-3.5' />}
+                        <span>{speakingIdx === i && tts.speaking ? 'To‘xtatish' : 'Tinglash'}</span>
+                      </button>
                     )}
                   </div>
                 </div>
