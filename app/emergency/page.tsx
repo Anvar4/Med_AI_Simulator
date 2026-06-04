@@ -163,6 +163,10 @@ export default function EmergencyPage() {
 			setResult(null)
 			setDiagnosis('')
 			setTreatment('')
+			// Auto-read the patient's complaint/history aloud (gender-matched voice).
+			const g = c.patient?.gender === 'Ayol' ? 'female' : 'male'
+			const symptomText = `${c.patient?.complaints || ''}. ${c.patient?.history || ''}`.trim()
+			if (symptomText.length > 1) tts.speak(symptomText, g)
 			setTimeExpired(false)
 		} catch (e) {
 			alert(e instanceof Error ? e.message : 'Xatolik')

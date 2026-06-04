@@ -3,6 +3,7 @@
 
 import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
+import TtsToggle from '@/components/layout/TtsToggle';
 import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -84,6 +85,7 @@ export default function Sidebar() {
 				</div>
 				{user && (
 					<div className='flex items-center gap-2'>
+						<TtsToggle compact />
 						<div className='text-right'>
 							<p className='text-xs font-semibold text-text-primary'>{user.name}</p>
 						</div>
@@ -170,8 +172,9 @@ export default function Sidebar() {
 										</div>
 									</div>
 								)}
-								<div className='px-1 pb-1'>
+								<div className='px-1 pb-1 flex items-center gap-1'>
 									<LanguageSwitcher />
+									<TtsToggle compact />
 								</div>
 								<Link
 									href='/settings'

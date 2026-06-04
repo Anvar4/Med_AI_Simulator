@@ -52,16 +52,17 @@ export default function PatientSimulator({
 		return () => clearInterval(interval)
 	}, [fullText])
 
-	// Speak the patient's words once the typing finishes (gender-matched voice).
+	// Auto-read the patient's words as soon as the card mounts (gender-matched
+	// voice), in parallel with the typing animation — no waiting for typing to
+	// finish, so the voice starts right away.
 	useEffect(() => {
-		if (isTypingDone && !spokenRef.current) {
+		spokenRef.current = false
+		if (!spokenRef.current) {
 			spokenRef.current = true
 			patientTts.speak(fullText, patientGender)
 		}
-	}, [isTypingDone, fullText, patientGender, patientTts])
-
-	// Reset the "spoken" guard when the patient (text) changes.
-	useEffect(() => { spokenRef.current = false }, [fullText])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [fullText, patientGender])
 
 	const toggleSpeak = () => {
 		if (patientTts.speaking || patientTts.loading) patientTts.stop()
