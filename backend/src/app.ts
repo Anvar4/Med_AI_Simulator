@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/errorHandler';
 import adminRoutes from './routes/admin';
 import attemptRoutes from './routes/attempts';
 import authRoutes from './routes/auth';
+import balanceRoutes from './routes/balance';
 import caseRoutes from './routes/cases';
 import chatRoutes from './routes/chat';
 import courseRoutes from './routes/courses';
@@ -93,6 +94,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }))
 app.use('/uploads', express.static(resolveUploadsDir()))
 
 app.use('/api/auth', authRoutes)
+app.use('/api/balance', balanceRoutes)
 app.use('/api/cases', caseRoutes)
 app.use('/api/attempts', attemptRoutes)
 app.use('/api/admin', adminRoutes)

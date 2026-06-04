@@ -20,6 +20,15 @@ import {
     updateUser,
 } from '../controllers/adminController'
 import { getCaseStats, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
+import {
+    approveTopUpAdmin,
+    createCard,
+    deleteCard,
+    listCards,
+    listTopUps,
+    rejectTopUpAdmin,
+    updateCard,
+} from '../controllers/paymentAdminController'
 import { protect, restrictTo } from '../middleware/auth'
 
 const router = Router()
@@ -58,5 +67,16 @@ router.get('/promo-codes/export', exportPromoCodes)
 router.get('/payments', getPaymentRequests)
 router.post('/payments/:id/confirm', confirmPaymentRequest)
 router.post('/payments/:id/reject', rejectPaymentRequest)
+
+// Payment cards CRUD
+router.get('/cards', listCards)
+router.post('/cards', createCard)
+router.patch('/cards/:id', updateCard)
+router.delete('/cards/:id', deleteCard)
+
+// Balance top-up requests
+router.get('/topups', listTopUps)
+router.post('/topups/:id/approve', approveTopUpAdmin)
+router.post('/topups/:id/reject', rejectTopUpAdmin)
 
 export default router

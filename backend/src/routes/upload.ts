@@ -65,11 +65,12 @@ const fileFilter = (_req: express.Request, file: Express.Multer.File, cb: multer
     'image/webp',
     'video/mp4',
     'video/webm',
+    'application/pdf', // payment receipts may be PDF
   ]
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true)
   } else {
-    cb(new Error('Faqat rasm (JPEG, PNG, GIF, WebP) va video (MP4, WebM) formatlariga ruxsat beriladi'))
+    cb(new Error('Faqat rasm (JPEG, PNG, GIF, WebP), video (MP4, WebM) yoki PDF formatlariga ruxsat beriladi'))
   }
 }
 

@@ -15,6 +15,9 @@ export interface IUser extends Document {
   avatar?: string
   specialty?: string
   university?: string
+  phone?: string
+  telegramId?: string
+  balance: number              // site balance in so'm
   stats: {
     totalCases: number
     avgScore: number
@@ -76,6 +79,9 @@ const userSchema = new Schema<IUser>(
     avatar: String,
     specialty: String,
     university: String,
+    phone: { type: String, trim: true },
+    telegramId: { type: String, trim: true, index: true, sparse: true },
+    balance: { type: Number, default: 0, min: 0 },
     stats: {
       totalCases: { type: Number, default: 0 },
       avgScore: { type: Number, default: 0 },
