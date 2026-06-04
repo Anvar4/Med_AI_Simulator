@@ -522,9 +522,83 @@ export const api = {
       )
     },
   },
+
+  // ─── Balance / manual top-up / subscription from balance ────
+  balance: {
+    me: () =>
+      request<{ status: string; balance: number; isPremium: boolean; subscription: UserSubscription; prices: { monthly: number; yearly: number; yearlyOld: number } }>('/balance/me'),
+    cards: () =>
+      request<{ status: string; cards: ActiveCard[] }>('/balance/cards'),
+    topup: (data: { amount: number; cardId: string; receiptUrl: string }) =>
+      request<{ status: string; message: string; topUpId: string }>('/balance/topup', { method: 'POST', body: JSON.stringify(data) }),
+    myTopUps: () =>
+      request<{ status: string; topups: TopUpRow[] }>('/balance/topups'),
+    subscribe: (plan: 'monthly' | 'yearly') =>
+      request<{ status: string; message: string; balance: number; expiresAt: string }>('/balance/subscribe', { method: 'POST', body: JSON.stringify({ plan }) }),
+    notifications: () =>
+      request<{ status: string; notifications: AppNotification[]; unread: number }>('/balance/notifications'),
+    markRead: (id?: string) =>
+      request<{ status: string }>('/balance/notifications/read', { method: 'POST', body: JSON.stringify({ id }) }),
+  },
+
+  // ─── Admin: cards + top-up requests ─────────────────────────
+  paymentAdmin: {
+    listCards: () =>
+      request<{ status: string; cards: AdminCard[] }>('/admin/cards'),
+    createCard: (data: Partial<AdminCard>) =>
+      request<{ status: string; card: AdminCard }>('/admin/cards', { method: 'POST', body: JSON.stringify(data) }),
+    updateCard: (id: string, data: Partial<AdminCard>) =>
+      request<{ status: string; card: AdminCard }>(`/admin/cards/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteCard: (id: string) =>
+      request<{ status: string; message: string }>(`/admin/cards/${id}`, { method: 'DELETE' }),
+    listTopUps: (status?: string) => {
+      const qs = status ? `?status=${status}` : ''
+      return request<{ status: string; total: number; topups: AdminTopUp[] }>(`/admin/topups${qs}`)
+    },
+    approveTopUp: (id: string) =>
+      request<{ status: string; message: string; newBalance: number }>(`/admin/topups/${id}/approve`, { method: 'POST' }),
+    rejectTopUp: (id: string, reason: string) =>
+      request<{ status: string; message: string }>(`/admin/topups/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  },
 }
 
 // ─── Types ────────────────────────────────────────────────────
+
+export interface ActiveCard {
+  _id: string
+  cardNumber: string
+  cardHolderName: string
+  bankName: string
+  description?: string
+}
+export interface AdminCard extends ActiveCard {
+  isActive: boolean
+  sortOrder: number
+  createdAt?: string
+}
+export interface TopUpRow {
+  _id: string
+  amount: number
+  status: 'pending' | 'approved' | 'rejected'
+  rejectionReason?: string
+  receiptUrl: string
+  card?: { cardNumber: string; bankName: string } | string
+  createdAt: string
+  reviewedAt?: string
+}
+export interface AdminTopUp extends Omit<TopUpRow, 'card'> {
+  user: { _id: string; name: string; email: string; phone?: string; username?: string } | string
+  card?: { cardNumber: string; cardHolderName: string; bankName: string } | string
+  reviewedByAdmin?: { name: string } | string
+}
+export interface AppNotification {
+  _id: string
+  title: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  isRead: boolean
+  createdAt: string
+}
 
 export interface RevenueAnalytics {
   currency: string
