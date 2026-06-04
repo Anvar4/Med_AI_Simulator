@@ -40,6 +40,7 @@ export default function SketchfabViewer({ embedUrl, title, className = '' }: Ske
         title={title}
         src={src}
         onLoad={() => setLoading(false)}
+        loading='lazy'
         className={`w-full h-full border-0 transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`}
         allow='autoplay; fullscreen; xr-spatial-tracking'
         allowFullScreen

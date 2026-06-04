@@ -28,11 +28,14 @@ export function tl(text: LocalizedText, locale: Locale): string {
   return text[locale] ?? text.uz
 }
 
-// Embed UI flags: hide as much chrome as the platform allows.
+// Embed flags. Performance-tuned: do NOT autostart/preload heavy geometry —
+// the model loads on demand (when the viewer mounts the iframe), and Sketchfab's
+// own loading bar is shown so the user sees progress instead of a frozen screen.
 const EMBED_PARAMS: Record<string, string> = {
-  autostart: '1',
-  preload: '1',
+  autostart: '0',        // don't force-load the full model immediately
+  preload: '0',          // don't pre-fetch all textures up front
   transparent: '1',
+  ui_loading: '1',       // show Sketchfab's loading progress
   ui_infos: '0',
   ui_controls: '0',
   ui_stop: '0',
@@ -45,7 +48,6 @@ const EMBED_PARAMS: Record<string, string> = {
   ui_vr: '0',
   ui_fullscreen: '0',
   ui_annotations: '0',
-  ui_loading: '0',
   ui_inspector: '0',
   ui_theme: 'dark',
   dnt: '1',
