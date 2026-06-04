@@ -176,8 +176,12 @@ export const createCase = async (req: AuthRequest, res: Response): Promise<void>
     const isAdmin = req.user!.role === 'admin'
     const status = resolveCaseStatus(isAdmin, req.body.status, 'published')
 
+    // caseId is server-generated (the client can't set it — see stripProtectedFields).
+    const caseId = `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
     const caseData = {
       ...payload,
+      caseId,
       createdBy: req.user!._id,
       authorName,
       instrumentalTests,
