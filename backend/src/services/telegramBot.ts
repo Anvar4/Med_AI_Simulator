@@ -55,17 +55,27 @@ async function buildTopUpMessage(topUpId: string) {
   const c = topUp.card as unknown as { cardNumber?: string; cardHolderName?: string; bankName?: string }
 
   const text =
-    `🆕 *Yangi balans to'ldirish arizasi*\n\n` +
-    `🧾 Ariza ID: \`${topUp._id}\`\n` +
+    `🆕 Yangi balans to'ldirish arizasi\n\n` +
+    `🧾 Ariza ID: ${topUp._id}\n` +
     `👤 Foydalanuvchi: ${u?.name || '—'}\n` +
     `✉️ Email: ${u?.email || '—'}\n` +
     `📞 Tel: ${u?.phone || '—'}\n` +
-    `💰 Summa: *${topUp.amount.toLocaleString()} so'm*\n` +
+    `💰 Summa: ${topUp.amount.toLocaleString()} so'm\n` +
     `💳 Karta: ${c?.cardNumber || '—'}\n` +
     `👨‍💼 Karta egasi: ${c?.cardHolderName || '—'}\n` +
     `🏦 Bank: ${c?.bankName || '—'}\n` +
     `🕒 Sana: ${topUp.createdAt.toLocaleString('uz')}\n` +
     `📌 Holat: Kutilmoqda`
+
+  const secondRow: TelegramBot.InlineKeyboardButton[] = [
+    { text: '👤 Foydalanuvchi', callback_data: `noop:${u?._id}` },
+  ]
+  // Telegram rejects non-public URLs (localhost) on inline buttons — only add
+  // the "open in admin panel" link when ADMIN_PANEL_URL is a real https/public url.
+  const panelUrl = FRONT()
+  if (/^https?:\/\/(?!localhost|127\.0\.0\.1)/.test(panelUrl)) {
+    secondRow.push({ text: '🧾 Admin panelda ochish', url: panelUrl })
+  }
 
   const keyboard: TelegramBot.InlineKeyboardMarkup = {
     inline_keyboard: [
@@ -73,10 +83,7 @@ async function buildTopUpMessage(topUpId: string) {
         { text: '✅ Tasdiqlash', callback_data: `approve:${topUp._id}` },
         { text: '❌ Rad etish', callback_data: `reject:${topUp._id}` },
       ],
-      [
-        { text: '👤 Foydalanuvchi', callback_data: `noop:${u?._id}` },
-        { text: '🧾 Admin panelda ochish', url: FRONT() },
-      ],
+      secondRow,
     ],
   }
   return { text, keyboard, receiptUrl: topUp.receiptUrl }
@@ -87,29 +94,53 @@ async function sendTopUpToAdmins(topUpId: string): Promise<void> {
   if (!bot) return
   const msg = await buildTopUpMessage(topUpId)
   if (!msg) return
+  // Resolve the receipt to something Telegram can actually fetch/upload.
+  // Local uploads (/uploads/..) aren't reachable by Telegram's servers, so we
+  // upload the file from disk as a Buffer. Remote http(s) urls are passed through.
+  const receiptPhoto = await resolveReceiptPhoto(msg.receiptUrl)
+
   const targets = await getTargetChatIds()
   for (const chatId of targets) {
-    try {
-      // Try to send the receipt as a photo/document with the caption.
-      const isImage = /\.(png|jpe?g|webp|gif)$/i.test(msg.receiptUrl)
-      const receiptFull = msg.receiptUrl.startsWith('http')
-        ? msg.receiptUrl
-        : `${process.env.FRONTEND_URL || ''}${msg.receiptUrl}`
-      let sent: TelegramBot.Message
-      if (isImage) {
-        sent = await bot.sendPhoto(chatId, receiptFull, { caption: msg.text, parse_mode: 'Markdown', reply_markup: msg.keyboard })
-      } else {
-        sent = await bot.sendMessage(chatId, `${msg.text}\n\n📎 Chek: ${receiptFull}`, { parse_mode: 'Markdown', reply_markup: msg.keyboard })
-      }
-      // Save the message id of the first send for later edits.
-      await BalanceTopUp.findByIdAndUpdate(topUpId, { telegramMessageId: sent.message_id })
-    } catch {
-      // Fallback to a plain text message if media send fails.
+    let sent: TelegramBot.Message | null = null
+    // 1) Try to attach the receipt as a photo with the caption.
+    if (receiptPhoto) {
       try {
-        await bot.sendMessage(chatId, msg.text, { parse_mode: 'Markdown', reply_markup: msg.keyboard })
-      } catch { /* ignore individual failures */ }
+        sent = await bot.sendPhoto(chatId, receiptPhoto, { caption: msg.text, reply_markup: msg.keyboard })
+      } catch { sent = null }
     }
+    // 2) Fallback: plain text message (with a receipt link if remote).
+    if (!sent) {
+      const linkLine = msg.receiptUrl.startsWith('http') ? `\n\n📎 Chek: ${msg.receiptUrl}` : ''
+      try {
+        sent = await bot.sendMessage(chatId, msg.text + linkLine, { reply_markup: msg.keyboard })
+      } catch (e) {
+        console.error('Telegram sendMessage failed:', (e as Error).message)
+      }
+    }
+    if (sent) await BalanceTopUp.findByIdAndUpdate(topUpId, { telegramMessageId: sent.message_id })
   }
+}
+
+/** Return a value Telegram can send as a photo, or null if not an image. */
+async function resolveReceiptPhoto(receiptUrl: string): Promise<string | Buffer | null> {
+  const isImage = /\.(png|jpe?g|webp|gif)$/i.test(receiptUrl)
+  if (!isImage) return null
+  if (receiptUrl.startsWith('http')) return receiptUrl
+  // Local upload: read the file from disk and send the buffer.
+  try {
+    const fs = await import('fs')
+    const path = await import('path')
+    const rel = receiptUrl.replace(/^\/+/, '') // uploads/xxx.png
+    const candidates = [
+      path.join(process.cwd(), 'public', rel),
+      path.join(process.cwd(), '..', 'public', rel),
+      path.join('/tmp', rel),
+    ]
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return fs.readFileSync(p)
+    }
+  } catch { /* fall through */ }
+  return null
 }
 
 /** Send a plain message to a single user by telegram id (best-effort). */
