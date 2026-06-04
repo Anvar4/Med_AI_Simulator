@@ -4,6 +4,7 @@
 import { canAccessAdmin, canAccessContentManager, useAuth } from '@/lib/auth-context';
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import TtsToggle from '@/components/layout/TtsToggle';
+import NotificationBell from '@/components/layout/NotificationBell';
 import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -84,7 +85,8 @@ export default function Sidebar() {
 					<img src='/logotip.png' alt='Med AI Simulator' className='h-10 sm:h-12 w-auto object-contain' />
 				</div>
 				{user && (
-					<div className='flex items-center gap-2'>
+					<div className='flex items-center gap-1.5'>
+						<NotificationBell />
 						<TtsToggle compact />
 						<div className='text-right'>
 							<p className='text-xs font-semibold text-text-primary'>{user.name}</p>
@@ -175,6 +177,7 @@ export default function Sidebar() {
 								<div className='px-1 pb-1 flex items-center gap-1'>
 									<LanguageSwitcher />
 									<TtsToggle compact />
+									<NotificationBell />
 								</div>
 								<Link
 									href='/settings'

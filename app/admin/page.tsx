@@ -5,6 +5,8 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { AdminCategory, AdminStats, api, BackendCase, BackendUser, CaseStats, PaymentRequestRow, PromoCode, RevenueAnalytics, ServerHealth } from '@/lib/api';
+import AdminCardsTab from '@/components/admin/AdminCardsTab';
+import AdminTopUpsTab from '@/components/admin/AdminTopUpsTab';
 import { canAccessAdmin, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -47,7 +49,7 @@ function formatUptime(seconds: number): string {
 	return `${m}d`
 }
 
-type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review'
+type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review' | 'cards' | 'topups'
 
 /* ─── Create/Edit User Modal ─── */
 interface UserModalProps {
@@ -502,6 +504,8 @@ export default function AdminPage() {
 		{ id: 'dashboard' as Tab, label: 'Boshqaruv' },
 		{ id: 'users' as Tab, label: 'Foydalanuvchilar' },
 		{ id: 'review' as Tab, label: 'Tekshiruv' },
+		{ id: 'topups' as Tab, label: 'Balans arizalari' },
+		{ id: 'cards' as Tab, label: 'Kartalar' },
 		{ id: 'payments' as Tab, label: 'To\'lovlar' },
 		{ id: 'categories' as Tab, label: 'Turkumlar' },
 		{ id: 'promo' as Tab, label: 'Promo kodlar' },
@@ -955,6 +959,20 @@ export default function AdminPage() {
 									</div>
 								)}
 							</AnimatePresence>
+						</motion.div>
+					)}
+
+					{/* ── Balance top-up requests ── */}
+					{tab === 'topups' && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<AdminTopUpsTab />
+						</motion.div>
+					)}
+
+					{/* ── Payment cards ── */}
+					{tab === 'cards' && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<AdminCardsTab />
 						</motion.div>
 					)}
 
