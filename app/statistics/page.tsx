@@ -6,7 +6,7 @@ import { api, Attempt, UserStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
 import { motion } from 'framer-motion';
-import { Activity, Award, BarChart3, BookOpen, Brain, Stethoscope, Target, TrendingUp } from 'lucide-react';
+import { Activity, Award, BarChart3, BookOpen, Brain, type LucideIcon, Stethoscope, Target, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -76,7 +76,7 @@ const DEMO_USER_STATS: UserStats = {
 	bestResult: DEMO_RECENT_RESULTS[0],
 }
 
-function SummaryCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: React.ElementType; sub?: string }) {
+function SummaryCard({ label, value, icon: Icon, sub }: { label: string; value: string | number; icon: LucideIcon; sub?: string }) {
 	return (
 		<div className='bg-surface rounded-2xl p-4 border border-border flex items-start gap-3'>
 			<div className='p-2.5 bg-primary/10 rounded-xl shrink-0'><Icon className='w-5 h-5 text-primary' /></div>

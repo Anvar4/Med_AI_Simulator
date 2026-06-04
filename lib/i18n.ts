@@ -235,7 +235,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'cases.recommendedForYou': 'Siz uchun tavsiya etiladi',
     'cases.adaptedToLevel': '(darajangizga moslashtirilgan)',
     'cases.notFound': 'Klinik holat topilmadi',
-    'simulator.viewerSubtitle': 'BioDigital Human Viewer',
+    'simulator.viewerSubtitle': 'Interaktiv 3D anatomiya',
 
     'library.loadingBook': 'Kitob yuklanmoqda...',
     'library.loadFailed': 'Yuklab bo\'lmadi',
@@ -530,7 +530,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'cases.recommendedForYou': 'Recommended for you',
     'cases.adaptedToLevel': '(adapted to your level)',
     'cases.notFound': 'No clinical cases found',
-    'simulator.viewerSubtitle': 'BioDigital Human Viewer',
+    'simulator.viewerSubtitle': 'Interaktiv 3D anatomiya',
 
     'library.loadingBook': 'Loading book...',
     'library.loadFailed': 'Failed to load',
@@ -825,7 +825,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'cases.recommendedForYou': 'Рекомендовано для вас',
     'cases.adaptedToLevel': '(адаптировано под ваш уровень)',
     'cases.notFound': 'Клинические случаи не найдены',
-    'simulator.viewerSubtitle': 'BioDigital Human Viewer',
+    'simulator.viewerSubtitle': 'Interaktiv 3D anatomiya',
 
     'library.loadingBook': 'Загрузка книги...',
     'library.loadFailed': 'Не удалось загрузить',

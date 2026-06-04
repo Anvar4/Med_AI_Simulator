@@ -6,12 +6,12 @@ import { api, SubscriptionPlan } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Award, Building2, CheckCircle, Copy, CreditCard, GraduationCap, Loader2, Lock, Percent, Share2, Tag, Users, X, Zap } from 'lucide-react';
+import { Award, Building2, CheckCircle, Copy, CreditCard, GraduationCap, Loader2, Lock, type LucideIcon, Percent, Share2, Tag, Users, X, Zap } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }
 
-const planIcons: Record<string, React.ElementType> = {
+const planIcons: Record<string, LucideIcon> = {
 	pro: Award,
 	clinic: Building2,
 	university: GraduationCap,
