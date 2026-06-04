@@ -6,7 +6,7 @@ import { CheckCircle, Copy, CreditCard, Loader2, Upload, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
-const MIN_TOPUP = 10000
+const MIN_TOPUP = 5000
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 function getToken(): string | null {

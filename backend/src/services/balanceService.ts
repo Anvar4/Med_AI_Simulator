@@ -15,7 +15,7 @@ export const PLANS = {
 } as const
 export type PlanId = keyof typeof PLANS
 
-export const MIN_TOPUP = 10000
+export const MIN_TOPUP = 5000
 
 /**
  * Approve a pending top-up and credit the user's balance — idempotent.
