@@ -1,8 +1,7 @@
-import dotenv from 'dotenv';
+import './loadEnv'; // MUST be first — loads .env before other imports read process.env
 import mongoose from 'mongoose';
 import app from './app';
-
-dotenv.config()
+import { initTelegramBot } from './services/telegramBot';
 
 const PORT = process.env.PORT || 5000
 
@@ -16,6 +15,9 @@ async function start() {
 
     await mongoose.connect(mongoUri)
     console.log('MongoDB ga muvaffaqiyatli ulandi')
+
+    // Start the Telegram approval bot (no-op if no token configured).
+    initTelegramBot()
 
     app.listen(PORT, () => {
       console.log(`Server ${PORT}-portda ishlamoqda`)

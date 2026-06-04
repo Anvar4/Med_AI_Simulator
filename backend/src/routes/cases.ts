@@ -9,7 +9,7 @@ import {
     getCMStats,
     updateCase,
 } from '../controllers/caseController'
-import { protect, restrictTo } from '../middleware/auth'
+import { optionalAuth, protect, restrictTo } from '../middleware/auth'
 
 const router = Router()
 
@@ -21,11 +21,13 @@ router.get('/categories', getCategories)
 router.get('/my', protect, restrictTo('admin', 'instructor'), getCMCases)
 router.get('/cm-stats', protect, restrictTo('admin', 'instructor'), getCMStats)
 
-router.get('/:id', getCaseById)
+router.get('/:id', optionalAuth, getCaseById)
 
-// Protected routes (admin/instructor only)
+// Protected routes
 router.post('/', protect, restrictTo('admin', 'instructor'), createCase)
 router.patch('/:id', protect, restrictTo('admin', 'instructor'), updateCase)
+// Deletion: admins delete any case; instructors delete only their own
+// (ownership enforced inside deleteCase).
 router.delete('/:id', protect, restrictTo('admin', 'instructor'), deleteCase)
 
 export default router

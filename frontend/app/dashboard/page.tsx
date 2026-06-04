@@ -1,0 +1,271 @@
+'use client'
+
+import CaseCard from '@/components/cases/CaseCard';
+import ActivityChart from '@/components/charts/ActivityChart';
+import Sidebar from '@/components/layout/Sidebar';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import ProgressBar from '@/components/ui/ProgressBar';
+import StatCard from '@/components/ui/StatCard';
+import { api, BackendCase, DashboardStats } from '@/lib/api';
+import { canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/language-context';
+import { motion } from 'framer-motion';
+import { ArrowRight, BookOpen, Calendar, Flame, Loader2, Target } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+const fadeIn = {
+	hidden: { opacity: 0, y: 20 },
+	visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+}
+
+const stagger = {
+	hidden: {},
+	visible: { transition: { staggerChildren: 0.1 } },
+}
+
+const DAY_LABELS = ['Ya', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh']
+
+export default function DashboardPage() {
+	const { user } = useAuth()
+	const { t } = useT()
+	const router = useRouter()
+	const [stats, setStats] = useState<DashboardStats | null>(null)
+	const [cases, setCases] = useState<BackendCase[]>([])
+	const [loading, setLoading] = useState(true)
+
+	useEffect(() => {
+		if (user && canAccessContentManager(user.role)) {
+			router.replace('/content-manager')
+			return
+		}
+	}, [user, router])
+
+	useEffect(() => {
+		if (user && canAccessContentManager(user.role)) return
+		async function load() {
+			try {
+				const [dashRes, casesRes] = await Promise.all([
+					api.attempts.getDashboard(),
+					api.cases.getAll({ limit: 3 }),
+				])
+				setStats(dashRes.stats)
+				setCases(casesRes.cases)
+			} catch {
+				// silent
+			} finally {
+				setLoading(false)
+			}
+		}
+		load()
+	}, [user])
+
+	if (loading) {
+		return (
+			<div className='min-h-screen bg-secondary'>
+				<Sidebar />
+				<main className='lg:pl-64 pt-16 lg:pt-0 flex items-center justify-center min-h-screen'>
+					<Loader2 className='w-8 h-8 text-primary animate-spin' />
+				</main>
+			</div>
+		)
+	}
+
+	const safeStats: DashboardStats = stats ?? {
+		totalCases: 0, avgScore: 0, weeklyCount: 0, streak: 0,
+		categoryScores: [], weeklyActivity: [], recentAttempts: [],
+	}
+	const safeCases = cases
+
+	const weeklyActivity = (safeStats.weeklyActivity ?? []).map(w => ({ day: DAY_LABELS[w._id] ?? `${w._id}`, count: w.count }))
+	const continueAttempt = safeStats.continueCase
+	const continueCaseData = continueAttempt?.case as BackendCase | undefined
+
+	return (
+		<div className='min-h-screen bg-secondary'>
+			<Sidebar />
+
+			<main className='lg:pl-64 pt-16 lg:pt-0 pb-6'>
+				<div className='p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto'>
+					{/* Header */}
+					<motion.div
+						initial='hidden'
+						animate='visible'
+						variants={fadeIn}
+						className='mb-8'
+					>
+						<h1 className='text-2xl sm:text-3xl font-bold text-text-primary mb-2'>
+							{t('dashboard.welcome')}
+						</h1>
+						<p className='text-text-secondary'>
+							{t('dashboard.subtitle')}
+						</p>
+					</motion.div>
+
+					{/* Stats Grid */}
+					<motion.div
+						initial='hidden'
+						animate='visible'
+						variants={stagger}
+						className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8'
+					>
+						<motion.div variants={fadeIn}>
+							<StatCard
+								icon={<BookOpen className='w-5 h-5' />}
+								value={safeStats.totalCases}
+								label={t('dashboard.totalCases')}
+							/>
+						</motion.div>
+						<motion.div variants={fadeIn}>
+							<StatCard
+								icon={<Target className='w-5 h-5' />}
+								value={Math.round(safeStats.avgScore)}
+								label={t('dashboard.avgScore')}
+							/>
+						</motion.div>
+						<motion.div variants={fadeIn}>
+							<StatCard
+								icon={<Calendar className='w-5 h-5' />}
+								value={safeStats.weeklyCount}
+								label={t('dashboard.thisWeek')}
+							/>
+						</motion.div>
+						<motion.div variants={fadeIn}>
+							<StatCard
+								icon={<Flame className='w-5 h-5' />}
+								value={`${safeStats.streak} kun 🔥`}
+								label={t('dashboard.streak')}
+							/>
+						</motion.div>
+					</motion.div>
+
+					<div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
+						{/* Activity Chart */}
+						<motion.div
+							initial='hidden'
+							animate='visible'
+							variants={fadeIn}
+							className='lg:col-span-2'
+						>
+							<Card hover={false}>
+								<h3 className='text-lg font-semibold text-text-primary mb-6'>
+									{t('dashboard.weeklyActivity')}
+								</h3>
+								<ActivityChart data={weeklyActivity} />
+							</Card>
+						</motion.div>
+
+						{/* Career Progress */}
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<Card hover={false} className='h-full'>
+								<h3 className='text-lg font-semibold text-text-primary mb-6'>
+									{t('dashboard.careerProgress')}
+								</h3>
+								<div className='space-y-5'>
+									{(safeStats.categoryScores ?? []).map(
+										(cat) => (
+											<div key={cat._id}>
+												<div className='flex justify-between items-center mb-2'>
+													<span className='text-sm text-text-secondary'>
+														{cat._id}
+													</span>
+													<span className='text-sm font-semibold text-text-primary'>
+														{Math.round(cat.avgScore)}%
+													</span>
+												</div>
+												<ProgressBar
+													value={Math.round(cat.avgScore)}
+													color={
+														cat.avgScore >= 90
+															? 'success'
+															: cat.avgScore >= 70
+																? 'primary'
+																: cat.avgScore >= 50
+																	? 'warning'
+																	: 'danger'
+													}
+												/>
+											</div>
+										),
+									)}
+								</div>
+							</Card>
+						</motion.div>
+					</div>
+
+					{/* Continue Learning */}
+					<motion.div
+						initial='hidden'
+						animate='visible'
+						variants={fadeIn}
+						className='mb-8'
+					>
+						{continueCaseData && (
+						<Card hover={false}>
+							<div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+								<div className='flex-1'>
+									<div className='flex items-center gap-2 mb-2'>
+										<Badge>{continueCaseData.category}</Badge>
+										<span className='text-xs text-text-secondary'>
+											{t('dashboard.continuing')}
+										</span>
+									</div>
+									<h3 className='text-base font-semibold text-text-primary mb-3'>
+										{continueCaseData.title}
+									</h3>
+								</div>
+								<Link href={`/cases/${continueCaseData._id}`}>
+									<Button size='sm'>
+										{t('dashboard.continueLearning')} <ArrowRight className='w-4 h-4' />
+									</Button>
+								</Link>
+							</div>
+						</Card>
+						)}
+					</motion.div>
+
+					{/* Recommended Cases */}
+					<motion.div initial='hidden' animate='visible' variants={stagger}>
+						<div className='flex items-center justify-between mb-4'>
+							<h3 className='text-lg font-semibold text-text-primary'>
+								{t('dashboard.recommended')}
+							</h3>
+							<Link href='/cases'>
+								<Button variant='ghost' size='sm'>
+									{t('dashboard.seeAll')} <ArrowRight className='w-4 h-4' />
+								</Button>
+							</Link>
+						</div>
+						{safeCases.length === 0 ? (
+							<Card hover={false} className='text-center py-10'>
+								<BookOpen className='w-9 h-9 text-text-secondary mx-auto mb-2' />
+								<p className='text-text-primary font-semibold'>Hozircha klinik holatlar yo&apos;q</p>
+								<p className='text-sm text-text-secondary mt-1'>Tez orada yangi holatlar qo&apos;shiladi.</p>
+							</Card>
+						) : (
+							<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
+								{safeCases.map(c => (
+									<motion.div key={c._id} variants={fadeIn}>
+										<CaseCard
+											id={c._id}
+											title={c.title}
+											authorName={c.authorName}
+											category={c.category}
+											difficulty={c.difficulty}
+											type={c.type}
+											isPremium={c.isPremium}
+											completionRate={0}
+										/>
+									</motion.div>
+								))}
+							</div>
+						)}
+					</motion.div>
+				</div>
+			</main>
+		</div>
+	)
+}

@@ -1,10 +1,92 @@
 import { Request, Response } from 'express'
 import { AuthRequest } from '../middleware/auth'
+import { activateSubscriptionFromPayment } from './subscriptionController'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { Category } from '../models/Category'
+import { PaymentRequest } from '../models/PaymentRequest'
 import { PromoCode } from '../models/PromoCode'
 import { User } from '../models/User'
+
+// ─── Payment requests (manual confirmation flow) ───────────────
+
+// GET /api/admin/payments?status=pending
+export const getPaymentRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { status, page = '1', limit = '20' } = req.query
+    const filter: Record<string, unknown> = {}
+    if (status && typeof status === 'string') filter.status = status
+
+    const pageNum = Math.max(1, parseInt(page as string))
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string)))
+
+    const [requests, total] = await Promise.all([
+      PaymentRequest.find(filter)
+        .populate('user', 'name email username')
+        .sort({ createdAt: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum),
+      PaymentRequest.countDocuments(filter),
+    ])
+
+    res.json({ status: 'success', total, totalPages: Math.ceil(total / limitNum), requests })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// POST /api/admin/payments/:id/confirm  body: { note?, providerTransactionId? }
+export const confirmPaymentRequest = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const pr = await PaymentRequest.findById(req.params.id)
+    if (!pr) {
+      res.status(404).json({ message: 'To\'lov so\'rovi topilmadi' })
+      return
+    }
+    if (pr.status !== 'pending') {
+      res.status(400).json({ message: `Bu so'rov allaqachon "${pr.status}" holatida` })
+      return
+    }
+
+    pr.status = 'paid'
+    pr.paidAt = new Date()
+    pr.paidAmount = pr.amount
+    pr.confirmedBy = req.user!._id
+    if (typeof req.body.note === 'string') pr.note = req.body.note
+    if (typeof req.body.providerTransactionId === 'string') {
+      pr.providerTransactionId = req.body.providerTransactionId
+    }
+    await pr.save()
+
+    await activateSubscriptionFromPayment(pr._id.toString())
+
+    res.json({ status: 'success', message: 'To\'lov tasdiqlandi va obuna faollashtirildi', request: pr })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// POST /api/admin/payments/:id/reject  body: { note? }
+export const rejectPaymentRequest = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const pr = await PaymentRequest.findById(req.params.id)
+    if (!pr) {
+      res.status(404).json({ message: 'To\'lov so\'rovi topilmadi' })
+      return
+    }
+    if (pr.status !== 'pending') {
+      res.status(400).json({ message: `Bu so'rov allaqachon "${pr.status}" holatida` })
+      return
+    }
+    pr.status = 'cancelled'
+    pr.confirmedBy = req.user!._id
+    if (typeof req.body.note === 'string') pr.note = req.body.note
+    await pr.save()
+    res.json({ status: 'success', message: 'To\'lov so\'rovi rad etildi', request: pr })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
 
 // ─── System stats ──────────────────────────────────────────────
 export const getSystemStats = async (_req: Request, res: Response): Promise<void> => {
@@ -65,10 +147,13 @@ export const getSystemStats = async (_req: Request, res: Response): Promise<void
 // ─── List users ────────────────────────────────────────────────
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { search, role, page = '1', limit = '20' } = req.query
+    const { search, role, provider, page = '1', limit = '20' } = req.query
 
     const filter: Record<string, unknown> = {}
     if (role && role !== 'all') filter.role = role as string
+    // Filter by sign-up method: 'google' (has googleId) vs 'email' (no googleId).
+    if (provider === 'google') filter.googleId = { $exists: true, $ne: null }
+    else if (provider === 'email') filter.googleId = { $in: [null, undefined] }
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -89,9 +174,16 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
       User.countDocuments(filter),
     ])
 
+    // Annotate each user with how they signed up (google vs email).
+    const usersWithProvider = users.map(u => {
+      const obj = u.toObject() as unknown as Record<string, unknown>
+      obj.authProvider = u.googleId ? 'google' : 'email'
+      return obj
+    })
+
     res.json({
       status: 'success',
-      users,
+      users: usersWithProvider,
       total,
       totalPages: Math.ceil(total / limitNum),
       currentPage: pageNum,

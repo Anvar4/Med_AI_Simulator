@@ -5,6 +5,45 @@ import { AuthRequest } from '../middleware/auth'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { User } from '../models/User'
+import { difficultyToLevel, unlockedLevel, type LevelStat } from './adaptiveEngine'
+
+/**
+ * Compute the user's unlocked learning level within a single category from
+ * their completed attempts (cheap, single-category aggregation).
+ */
+async function unlockedLevelForCategory(
+  userId: mongoose.Types.ObjectId,
+  category: string
+): Promise<number> {
+  const rows = await CaseAttempt.aggregate([
+    { $match: { user: userId, status: 'completed' } },
+    { $lookup: { from: 'cases', localField: 'case', foreignField: '_id', as: 'c' } },
+    { $unwind: '$c' },
+    { $match: { 'c.category': category } },
+    {
+      $group: {
+        _id: '$c.difficulty',
+        attempts: { $sum: 1 },
+        avgScore: { $avg: '$score' },
+      },
+    },
+  ])
+
+  const byLevel = new Map<number, { attempts: number; scoreSum: number }>()
+  for (const r of rows) {
+    const level = difficultyToLevel(r._id as number)
+    const cur = byLevel.get(level) || { attempts: 0, scoreSum: 0 }
+    cur.attempts += r.attempts
+    cur.scoreSum += r.avgScore * r.attempts
+    byLevel.set(level, cur)
+  }
+  const stats: LevelStat[] = Array.from(byLevel.entries()).map(([level, v]) => ({
+    level: level as LevelStat['level'],
+    attempts: v.attempts,
+    avgScore: Math.round(v.scoreSum / v.attempts),
+  }))
+  return unlockedLevel(stats)
+}
 
 let _openai: OpenAI | null = null
 const getOpenAI = () => {
@@ -23,16 +62,74 @@ export const startAttempt = async (req: AuthRequest, res: Response): Promise<voi
       return
     }
 
-    // Check if user already has an in-progress attempt
+    // Premium gating: only premium users (or staff) may start premium cases.
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'instructor'
+    if (caseData.isPremium && !req.user!.isPremium && !isStaff) {
+      res.status(403).json({
+        message: 'Bu premium klinik holat. Davom etish uchun Pro obunani faollashtiring.',
+        premiumRequired: true,
+      })
+      return
+    }
+
+    // Adaptive level gating: a learner may only start cases at or below their
+    // unlocked level in this category. Staff bypass. Resuming an existing
+    // in-progress attempt below also bypasses (it was already allowed).
+    if (!isStaff) {
+      const caseLevel = difficultyToLevel(caseData.difficulty)
+      const unlocked = await unlockedLevelForCategory(req.user!._id, caseData.category)
+      if (caseLevel > unlocked) {
+        res.status(403).json({
+          message: `Bu daraja hali ochilmagan. Avval "${caseData.category}" bo'yicha ${unlocked}-darajani o'zlashtiring.`,
+          levelLocked: true,
+          requiredLevel: caseLevel,
+          unlockedLevel: unlocked,
+        })
+        return
+      }
+    }
+
+    // A case may be solved only once: a completed attempt blocks re-doing it.
+    const completedSame = await CaseAttempt.findOne({
+      user: req.user!._id,
+      case: caseData._id,
+      status: 'completed',
+    })
+    if (completedSame && !isStaff) {
+      res.status(403).json({
+        message: 'Bu klinik holatni allaqachon yechgansiz. Har bir holat faqat bir marta ishlanadi.',
+        alreadyCompleted: true,
+      })
+      return
+    }
+
+    // Resume an in-progress attempt for this exact case.
     const existing = await CaseAttempt.findOne({
       user: req.user!._id,
       case: caseData._id,
       status: 'in-progress',
     })
-
     if (existing) {
       res.json({ status: 'success', attempt: existing, message: 'Davom ettirilmoqda' })
       return
+    }
+
+    // Daily limit for free (non-premium, non-staff) users: 1 new case per day.
+    if (!req.user!.isPremium && !isStaff) {
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const startedToday = await CaseAttempt.countDocuments({
+        user: req.user!._id,
+        createdAt: { $gte: startOfDay },
+      })
+      if (startedToday >= 1) {
+        res.status(403).json({
+          message: 'Bepul rejada kuniga 1 ta klinik holat ishlash mumkin. Cheksiz uchun Pro obunani faollashtiring.',
+          dailyLimitReached: true,
+          premiumRequired: true,
+        })
+        return
+      }
     }
 
     const attempt = await CaseAttempt.create({
@@ -86,6 +183,8 @@ export const submitAttempt = async (req: AuthRequest, res: Response): Promise<vo
     attempt.timeSpent = timeSpent
     attempt.score = aiResult.score
     attempt.aiFeedback = aiResult.feedback
+    attempt.strengths = aiResult.strengths
+    attempt.weaknesses = aiResult.weaknesses
     attempt.status = 'completed'
     attempt.completedAt = new Date()
     await attempt.save()
@@ -121,9 +220,17 @@ export const getMyAttempts = async (req: AuthRequest, res: Response): Promise<vo
     const pageNum = Math.max(1, parseInt(page as string))
     const limitNum = Math.min(50, Math.max(1, parseInt(limit as string)))
 
+    // The correct answer may only be revealed for already-completed attempts
+    // (used in the history page for learning). For any other status (e.g.
+    // in-progress) keep it hidden so the simulator can't be cheated.
+    const revealAnswer = status === 'completed'
+    const caseFields = revealAnswer
+      ? 'caseId title category difficulty type correctDiagnosis correctTreatment'
+      : 'caseId title category difficulty type'
+
     const [attempts, total] = await Promise.all([
       CaseAttempt.find(filter)
-        .populate('case', 'caseId title category difficulty type')
+        .populate('case', caseFields)
         .sort({ createdAt: -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum),

@@ -1,127 +1,124 @@
 # Med AI Simulator
 
-Full-stack medical case simulation platform.
+Full-stack medical case simulation platform. Frontend va backend ikkita **mustaqil
+papkada** — har birini alohida serverga/xizmatga yuklash mumkin.
 
-- Frontend: Next.js (App Router) in workspace root
-- Backend: Express + MongoDB in `backend/`
+- Frontend: Next.js (App Router) — `frontend/`
+- Backend: Express + MongoDB — `backend/`
 
 ## Project Architecture
 
 ```text
 med-ai-simulator/
-|- app/                 # Next.js routes
-|- components/          # Shared React UI
-|- lib/                 # Frontend API/auth/theme helpers
-|- public/              # Static files + uploads mirror
-|- backend/             # Express API (controllers/routes/models)
-|  |- src/
+|- frontend/            # Next.js app (mustaqil deploy)
+|  |- app/              # Next.js routes
+|  |- components/       # React UI
+|  |- lib/             # API/auth/theme helpers
+|  |- public/          # Static files
+|  |- image/           # Patient/asset rasmlar (seed manbai)
+|  |- package.json
+|  |- next.config.ts
 |  |- .env.example
-|- .env.example         # Frontend env template
-|- package.json         # Frontend + monorepo helper scripts
+|- backend/             # Express API (mustaqil deploy)
+|  |- src/             # controllers / routes / models / services
+|  |- public/uploads/  # Backend xizmat qiladigan statik fayllar (seed ko'chiradi)
+|  |- package.json
+|  |- .env.example
+|- package.json         # Monorepo qulaylik skriptlari (ixtiyoriy)
+|- ecosystem.config.cjs # PM2 (ikkala xizmat)
 ```
 
 ## Prerequisites
 
 - Node.js 20+
 - npm 10+
-- MongoDB 7+ (local or remote)
+- MongoDB 7+ (local yoki Atlas)
 
 ## Environment Setup
 
-Create environment files from examples:
-
 ```bash
 # frontend
-cp .env.example .env.local
+cp frontend/.env.example frontend/.env.local
 
 # backend
 cp backend/.env.example backend/.env
 ```
 
-Required values to set:
+Majburiy qiymatlar:
 
-- `backend/.env`:
-	- `MONGODB_URI`
-	- `JWT_SECRET`
-	- `CLIENT_ORIGINS` (comma-separated)
-- `.env.local`:
-	- `NEXT_PUBLIC_API_URL`
-	- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (optional)
+- `backend/.env`: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_ORIGINS` (vergul bilan)
+- `frontend/.env.local`: `NEXT_PUBLIC_API_URL` (backend manzili, masalan `http://localhost:5000/api`)
 
 ## Install
 
+Har bir papkani alohida:
+
 ```bash
-npm install
-npm --prefix backend install
+cd frontend && npm install
+cd ../backend && npm install
 ```
+
+Yoki root'dan: `npm run install:all`
 
 ## Development
 
-Run frontend:
+Ikki terminalda:
 
 ```bash
-npm run dev
+# Terminal 1 — backend
+cd backend && npm run dev      # http://localhost:5000
+
+# Terminal 2 — frontend
+cd frontend && npm run dev     # http://localhost:3000
 ```
 
-Run backend (second terminal):
+Root'dan: `npm run dev:backend` va `npm run dev:frontend`
+
+## Seed (klinik holatlar + xodim hisoblari)
+
+Backend papkasidan:
 
 ```bash
-npm run dev:backend
+cd backend && npm run seed
 ```
 
-## Build and Run (Production)
+> ⚠️ Seed `cases`, `caseattempts`, `categories` kolleksiyalarini **tozalaydi** va
+> 133 ta klinik holat + 20 kategoriya + 2 xodim hisobini (admin, manager) qaytadan
+> yozadi. Real foydalanuvchilar saqlanadi, lekin ularning urinishlari o'chadi.
+> Bemor/tahlil rasmlari `frontend/`'dan `backend/public/uploads/`'ga ko'chiriladi.
 
-Build both apps:
+## Build & Production
 
 ```bash
-npm run build:all
+# Backend
+cd backend && npm run build && npm run start    # node dist/server.js, PORT=5000
+
+# Frontend (standalone)
+cd frontend && npm run build && npm run start    # PORT=3000
 ```
 
-Start frontend:
+### PM2 (ikkala xizmat birga)
 
 ```bash
-npm run start
-```
-
-Start backend:
-
-```bash
-npm run start:backend
-```
-
-## Useful Scripts
-
-- `npm run dev` - Next.js frontend dev server
-- `npm run dev:backend` - backend dev server
-- `npm run build` - frontend build only
-- `npm run build:all` - frontend + backend build
-- `npm run seed` - seed backend demo data
-- `npm run wipe:cases` - clear case + attempt data
-
-## Server Deployment Notes
-
-- Frontend now uses `output: 'standalone'` in `next.config.ts`, suitable for self-hosted Node deployment.
-- Backend CORS is environment-driven via `CLIENT_ORIGINS`.
-- Keep frontend and backend as separate services/processes in production (systemd, PM2, Docker, or platform services).
-
-### PM2 Quick Deploy
-
-```bash
-# 1) Build artifacts
-npm run build:all
-
-# 2) Start both services with PM2
+cd backend && npm install && npm run build
+cd ../frontend && npm install && npm run build
 pm2 start ecosystem.config.cjs
-
-# 3) Persist PM2 process list
 pm2 save
 ```
 
-The PM2 config file is located at `ecosystem.config.cjs`.
+### Vercel (faqat frontend)
+
+Vercel loyihasida **Root Directory = `frontend`** qilib belgilang. Backendni
+alohida xizmatda (VPS/Render/Railway) joylashtiring va `NEXT_PUBLIC_API_URL`'ni
+o'sha manzilga yo'naltiring.
+
+## Deployment eslatmalari
+
+- Frontend `output: 'standalone'` (`frontend/next.config.ts`) — self-host Node uchun.
+- Backend CORS `CLIENT_ORIGINS` orqali boshqariladi (frontend domeni shu yerga qo'shilsin).
+- Backend statik fayllarni `backend/public/uploads/`'dan `/uploads`'da xizmat qiladi.
 
 ## Health Check
-
-Backend health endpoint:
 
 ```text
 GET /api/health

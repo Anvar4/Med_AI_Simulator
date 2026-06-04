@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import {
+    confirmPaymentRequest,
     createCategory,
     createUser,
     deleteCategory,
@@ -8,14 +9,26 @@ import {
     generatePromoCodes,
     getAdminAnalytics,
     getCategories,
+    getPaymentRequests,
     getPromoCodes,
     getRecentActivity,
     getSystemStats,
     getUserById,
     getUsers,
+    rejectPaymentRequest,
     updateCategory,
     updateUser,
 } from '../controllers/adminController'
+import { getCaseStats, getReferralAnalytics, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
+import {
+    approveTopUpAdmin,
+    createCard,
+    deleteCard,
+    listCards,
+    listTopUps,
+    rejectTopUpAdmin,
+    updateCard,
+} from '../controllers/paymentAdminController'
 import { protect, restrictTo } from '../middleware/auth'
 
 const router = Router()
@@ -32,6 +45,10 @@ router.use(restrictTo('admin'))
 router.get('/stats', getSystemStats)
 router.get('/activity', getRecentActivity)
 router.get('/analytics', getAdminAnalytics)
+router.get('/revenue', getRevenueAnalytics)
+router.get('/server-health', getServerHealth)
+router.get('/case-stats', getCaseStats)
+router.get('/referrals', getReferralAnalytics)
 
 router.get('/users', getUsers)
 router.get('/users/:id', getUserById)
@@ -46,5 +63,21 @@ router.delete('/categories/:id', deleteCategory)
 router.post('/promo-codes', generatePromoCodes)
 router.get('/promo-codes', getPromoCodes)
 router.get('/promo-codes/export', exportPromoCodes)
+
+// Payment requests (manual confirmation until gateway is wired in)
+router.get('/payments', getPaymentRequests)
+router.post('/payments/:id/confirm', confirmPaymentRequest)
+router.post('/payments/:id/reject', rejectPaymentRequest)
+
+// Payment cards CRUD
+router.get('/cards', listCards)
+router.post('/cards', createCard)
+router.patch('/cards/:id', updateCard)
+router.delete('/cards/:id', deleteCard)
+
+// Balance top-up requests
+router.get('/topups', listTopUps)
+router.post('/topups/:id/approve', approveTopUpAdmin)
+router.post('/topups/:id/reject', rejectTopUpAdmin)
 
 export default router

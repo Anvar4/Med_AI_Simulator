@@ -15,6 +15,11 @@ export interface IUser extends Document {
   avatar?: string
   specialty?: string
   university?: string
+  phone?: string
+  telegramId?: string
+  balance: number              // site balance in so'm
+  points: number               // referral points (used for ranking)
+  chatUsage?: { date: string; count: number } // daily AI-chat question counter
   stats: {
     totalCases: number
     avgScore: number
@@ -76,6 +81,14 @@ const userSchema = new Schema<IUser>(
     avatar: String,
     specialty: String,
     university: String,
+    phone: { type: String, trim: true },
+    telegramId: { type: String, trim: true, index: true, sparse: true },
+    balance: { type: Number, default: 0, min: 0 },
+    points: { type: Number, default: 0, min: 0 },
+    chatUsage: {
+      date: { type: String },
+      count: { type: Number, default: 0 },
+    },
     stats: {
       totalCases: { type: Number, default: 0 },
       avgScore: { type: Number, default: 0 },

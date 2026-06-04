@@ -1,8 +1,8 @@
+import './loadEnv'; // MUST be first — loads .env before route modules read process.env
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
 import cors from 'cors';
-import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -11,14 +11,18 @@ import { errorHandler } from './middleware/errorHandler';
 import adminRoutes from './routes/admin';
 import attemptRoutes from './routes/attempts';
 import authRoutes from './routes/auth';
+import balanceRoutes from './routes/balance';
 import caseRoutes from './routes/cases';
 import chatRoutes from './routes/chat';
+import courseRoutes from './routes/courses';
+import learningRoutes from './routes/learning';
+import paymentRoutes from './routes/payments';
+import referralRoutes from './routes/referrals';
+import sttRoutes from './routes/stt';
 import statsRoutes from './routes/stats';
 import subscriptionRoutes from './routes/subscriptions';
 import ttsRoutes from './routes/tts';
 import uploadRoutes from './routes/upload';
-
-dotenv.config()
 
 const FALLBACK_ORIGINS = [
   'http://localhost:3000',
@@ -89,14 +93,20 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }))
 app.use('/uploads', express.static(resolveUploadsDir()))
 
 app.use('/api/auth', authRoutes)
+app.use('/api/balance', balanceRoutes)
 app.use('/api/cases', caseRoutes)
 app.use('/api/attempts', attemptRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/stats', statsRoutes)
 app.use('/api/subscriptions', subscriptionRoutes)
 app.use('/api/tts', ttsRoutes)
+app.use('/api/stt', sttRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/courses', courseRoutes)
+app.use('/api/learning', learningRoutes)
+app.use('/api/payments', paymentRoutes)
+app.use('/api/referrals', referralRoutes)
 
 app.get('/api/health', (_req, res) => {
   res.json({
