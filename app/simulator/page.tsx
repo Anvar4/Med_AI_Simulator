@@ -5,23 +5,25 @@ import ControlsPanel from '@/components/simulator/ControlsPanel'
 import SketchfabViewer from '@/components/simulator/SketchfabViewer'
 import { useT } from '@/lib/language-context'
 import type { Locale } from '@/lib/i18n'
-import { ANATOMY_MODELS } from '@/lib/anatomy-models'
+import { ANATOMY_MODELS, tl } from '@/lib/anatomy-models'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Activity, ChevronLeft, ChevronRight, Info, Maximize2 } from 'lucide-react'
+import { Activity, ChevronDown, ChevronLeft, ChevronRight, Info, Layers, List, Maximize2, X } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 export default function SimulatorPage() {
-  const { locale } = useT()
+  const { locale, t } = useT()
   const lc = locale as Locale
   const [selectedId, setSelectedId] = useState(ANATOMY_MODELS[0].id)
-  const [panelOpen, setPanelOpen] = useState(true)
-  const [infoOpen, setInfoOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)        // desktop: model list
+  const [mobilePicker, setMobilePicker] = useState(false) // mobile: model list sheet
+  const [infoOpen, setInfoOpen] = useState(true)          // detail panel (parts/description)
 
   const model = ANATOMY_MODELS.find(m => m.id === selectedId) ?? ANATOMY_MODELS[0]
-  const modelTitle = lc === 'en' ? model.titleEn : model.titleUz
+  const modelTitle = tl(model.title, lc)
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id)
+    setMobilePicker(false)
   }, [])
 
   const handleFullscreen = useCallback(() => {
@@ -37,18 +39,24 @@ export default function SimulatorPage() {
 
       <main className='lg:pl-64 pt-16 lg:pt-0 flex flex-col h-dvh'>
         {/* Top bar */}
-        <div className='shrink-0 flex items-center justify-between px-4 sm:px-6 h-14 lg:h-16 border-b border-border bg-surface/50 backdrop-blur-sm'>
-          <div className='flex items-center gap-3'>
-            <div className='w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center'>
+        <div className='shrink-0 flex items-center justify-between px-3 sm:px-6 h-14 lg:h-16 border-b border-border bg-surface/50 backdrop-blur-sm'>
+          <div className='flex items-center gap-2.5 min-w-0'>
+            <div className='w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0'>
               <Activity className='w-4 h-4 text-primary' />
             </div>
-            <div>
-              <h1 className='text-sm font-bold text-text-primary leading-tight'>3D Anatomiya Simulyatori</h1>
-              <p className='text-xs text-text-secondary hidden sm:block'>{modelTitle}</p>
+            <div className='min-w-0'>
+              <h1 className='text-sm font-bold text-text-primary leading-tight truncate'>{t('simulator.title')}</h1>
+              <p className='text-[11px] text-text-secondary truncate'>{modelTitle}</p>
             </div>
           </div>
 
-          <div className='flex items-center gap-1'>
+          <div className='flex items-center gap-1 shrink-0'>
+            {/* Mobile: open model list */}
+            <button onClick={() => setMobilePicker(true)}
+              className='lg:hidden p-2 rounded-xl text-text-secondary hover:bg-surface-light hover:text-text-primary transition-all'
+              title='Modellar'>
+              <List className='w-4 h-4' />
+            </button>
             <button onClick={() => setInfoOpen(!infoOpen)}
               className={`p-2 rounded-xl transition-all duration-200 ${infoOpen ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-surface-light hover:text-text-primary'}`}
               title="Ma'lumot">
@@ -67,22 +75,9 @@ export default function SimulatorPage() {
           </div>
         </div>
 
-        {/* Model info bar */}
-        <AnimatePresence>
-          {infoOpen && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }} className='overflow-hidden border-b border-border bg-primary/5'>
-              <div className='px-4 sm:px-6 py-3'>
-                <p className='text-xs font-bold text-primary uppercase tracking-wider mb-1'>{modelTitle}</p>
-                <p className='text-xs text-text-secondary leading-relaxed'>{model.note}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Main content */}
         <div className='flex flex-1 overflow-hidden'>
-          {/* Controls Panel */}
+          {/* Desktop controls panel */}
           <AnimatePresence initial={false}>
             {panelOpen && (
               <motion.div key='panel'
@@ -101,21 +96,74 @@ export default function SimulatorPage() {
             <SketchfabViewer embedUrl={model.embedUrl} title={modelTitle} className='w-full h-full' />
 
             {/* Model badge */}
-            <div className='absolute top-4 left-4 z-30 pointer-events-none'>
-              <div className='px-3 py-1.5 rounded-lg bg-surface/80 backdrop-blur-sm border border-border text-xs font-medium text-text-primary'>
+            <div className='absolute top-3 left-3 z-30 pointer-events-none'>
+              <div className='px-3 py-1.5 rounded-lg bg-surface/80 backdrop-blur-sm border border-border text-xs font-medium text-text-primary max-w-[60vw] truncate'>
                 {modelTitle}
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Mobile bottom panel */}
-        <div className='lg:hidden shrink-0 border-t border-border bg-surface'>
-          <div className='p-3 max-h-60 overflow-y-auto'>
-            <ControlsPanel selectedId={selectedId} onSelect={handleSelect} />
+            {/* Detail panel (description + parts) — sits over the 3D without blocking it */}
+            <AnimatePresence>
+              {infoOpen && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.25 }}
+                  className='absolute z-30 glass border border-border rounded-2xl overflow-hidden flex flex-col
+                             top-3 right-3 w-[min(20rem,calc(100%-1.5rem))] max-h-[calc(100%-5rem)]
+                             max-sm:top-auto max-sm:bottom-12 max-sm:left-3 max-sm:right-3 max-sm:w-auto max-sm:max-h-[45%]'
+                >
+                  <div className='flex items-center gap-2 px-4 py-3 border-b border-border shrink-0'>
+                    <Layers className='w-4 h-4 text-primary shrink-0' />
+                    <h3 className='text-sm font-bold text-text-primary flex-1 truncate'>{modelTitle}</h3>
+                    <button onClick={() => setInfoOpen(false)} className='text-text-secondary hover:text-text-primary'>
+                      <X className='w-4 h-4' />
+                    </button>
+                  </div>
+                  <div className='p-4 overflow-y-auto space-y-4'>
+                    <p className='text-sm text-text-secondary leading-relaxed'>{tl(model.description, lc)}</p>
+                    <div>
+                      <p className='text-[10px] font-semibold text-primary uppercase tracking-wider mb-2'>{t('simulator.containedParts')}</p>
+                      <div className='flex flex-wrap gap-1.5'>
+                        {model.parts.map((p, i) => (
+                          <span key={i} className='text-[11px] px-2 py-1 rounded-lg bg-primary/10 text-primary'>{tl(p, lc)}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </main>
+
+      {/* Mobile model picker sheet */}
+      <AnimatePresence>
+        {mobilePicker && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMobilePicker(false)}
+              className='lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm'
+            />
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              className='lg:hidden fixed inset-x-0 bottom-0 z-50 max-h-[80vh] rounded-t-3xl bg-surface border-t border-border flex flex-col'
+            >
+              <div className='flex items-center justify-between px-4 py-3 border-b border-border shrink-0'>
+                <h3 className='text-sm font-bold text-text-primary'>{t('simulator.modelList')}</h3>
+                <button onClick={() => setMobilePicker(false)} className='text-text-secondary hover:text-text-primary'>
+                  <ChevronDown className='w-5 h-5' />
+                </button>
+              </div>
+              <div className='p-4 overflow-y-auto'>
+                <ControlsPanel selectedId={selectedId} onSelect={handleSelect} />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
