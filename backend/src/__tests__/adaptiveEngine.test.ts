@@ -32,8 +32,13 @@ test('mastering a level unlocks the next', () => {
   )
 })
 
-test('one attempt is not enough to advance even with a high score', () => {
-  assert.equal(unlockedLevel([{ level: 1, attempts: 1, avgScore: 100 }]), 1)
+test('a single passing attempt (>=60) unlocks the next level', () => {
+  assert.equal(unlockedLevel([{ level: 1, attempts: 1, avgScore: 100 }]), 2)
+  assert.equal(unlockedLevel([{ level: 1, attempts: 1, avgScore: 60 }]), 2)
+})
+
+test('scoring below 60 keeps the learner on the current level', () => {
+  assert.equal(unlockedLevel([{ level: 1, attempts: 3, avgScore: 59 }]), 1)
 })
 
 test('unlock is monotonic — a dip at level 1 does not relock level 2', () => {
@@ -69,11 +74,11 @@ test('recommendAction: mastered at the top level', () => {
   assert.deepEqual(recommendAction(stats), { action: 'mastered', targetLevel: 3 })
 })
 
-test('recommendAction: continue when progressing but not mastered', () => {
+test('recommendAction: reinforce at top level when below the pass score', () => {
   const stats: LevelStat[] = [
     { level: 1, attempts: 3, avgScore: 85 },
     { level: 2, attempts: 3, avgScore: 85 },
-    { level: 3, attempts: 1, avgScore: 60 },
+    { level: 3, attempts: 2, avgScore: 55 }, // below 60 -> not mastered yet
   ]
-  assert.deepEqual(recommendAction(stats), { action: 'continue', targetLevel: 3 })
+  assert.deepEqual(recommendAction(stats), { action: 'reinforce', targetLevel: 3 })
 })

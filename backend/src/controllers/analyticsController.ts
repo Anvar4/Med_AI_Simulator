@@ -1,9 +1,63 @@
 import os from 'os'
 import { Request, Response } from 'express'
 import mongoose from 'mongoose'
+import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { PaymentRequest } from '../models/PaymentRequest'
 import { User } from '../models/User'
+
+/**
+ * Clinical-case breakdown for the admin dashboard: totals, split by type
+ * (diagnostika/jarrohlik/shoshilinch), by category (specialty), by difficulty
+ * (1-5 stars), by status and premium count. All real, from the DB.
+ * GET /api/admin/case-stats
+ */
+export const getCaseStats = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const [total, premium, byType, byCategory, byDifficulty, byStatus] = await Promise.all([
+      Case.countDocuments({}),
+      Case.countDocuments({ isPremium: true }),
+      Case.aggregate([
+        { $group: { _id: '$type', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      Case.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 }, avgDifficulty: { $avg: '$difficulty' } } },
+        { $sort: { count: -1 } },
+      ]),
+      Case.aggregate([
+        { $group: { _id: '$difficulty', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      Case.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+    ])
+
+    const typeMap = Object.fromEntries(byType.map(t => [t._id, t.count]))
+    const difficulty = [1, 2, 3, 4, 5].map(level => ({
+      level,
+      count: byDifficulty.find(d => d._id === level)?.count || 0,
+    }))
+
+    res.json({
+      status: 'success',
+      caseStats: {
+        total,
+        premium,
+        emergency: typeMap['shoshilinch'] || 0,
+        diagnostika: typeMap['diagnostika'] || 0,
+        jarrohlik: typeMap['jarrohlik'] || 0,
+        byType: byType.map(t => ({ type: t._id, count: t.count })),
+        byCategory: byCategory.map(c => ({ category: c._id, count: c.count, avgDifficulty: Math.round((c.avgDifficulty || 0) * 10) / 10 })),
+        byDifficulty: difficulty,
+        byStatus: byStatus.map(s => ({ status: s._id, count: s.count })),
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
 
 /**
  * Revenue analytics derived from confirmed payments (PaymentRequest.status='paid').

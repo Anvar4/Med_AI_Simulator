@@ -147,10 +147,13 @@ export const getSystemStats = async (_req: Request, res: Response): Promise<void
 // ─── List users ────────────────────────────────────────────────
 export const getUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { search, role, page = '1', limit = '20' } = req.query
+    const { search, role, provider, page = '1', limit = '20' } = req.query
 
     const filter: Record<string, unknown> = {}
     if (role && role !== 'all') filter.role = role as string
+    // Filter by sign-up method: 'google' (has googleId) vs 'email' (no googleId).
+    if (provider === 'google') filter.googleId = { $exists: true, $ne: null }
+    else if (provider === 'email') filter.googleId = { $in: [null, undefined] }
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -171,9 +174,16 @@ export const getUsers = async (req: Request, res: Response): Promise<void> => {
       User.countDocuments(filter),
     ])
 
+    // Annotate each user with how they signed up (google vs email).
+    const usersWithProvider = users.map(u => {
+      const obj = u.toObject() as unknown as Record<string, unknown>
+      obj.authProvider = u.googleId ? 'google' : 'email'
+      return obj
+    })
+
     res.json({
       status: 'success',
-      users,
+      users: usersWithProvider,
       total,
       totalPages: Math.ceil(total / limitNum),
       currentPage: pageNum,

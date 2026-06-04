@@ -180,10 +180,11 @@ export const api = {
     getRecentActivity: () =>
       request<{ status: string; recentUsers: BackendUser[]; recentAttempts: unknown[] }>('/admin/activity'),
 
-    getUsers: (params?: { search?: string; role?: string; page?: number; limit?: number }) => {
+    getUsers: (params?: { search?: string; role?: string; provider?: string; page?: number; limit?: number }) => {
       const q = new URLSearchParams()
       if (params?.search) q.set('search', params.search)
       if (params?.role) q.set('role', params.role)
+      if (params?.provider) q.set('provider', params.provider)
       if (params?.page) q.set('page', String(params.page))
       if (params?.limit) q.set('limit', String(params.limit))
       return request<{ status: string; users: BackendUser[]; total: number; totalPages: number }>(`/admin/users?${q}`)
@@ -260,6 +261,9 @@ export const api = {
 
     getServerHealth: () =>
       request<{ status: string; server: ServerHealth }>('/admin/server-health'),
+
+    getCaseStats: () =>
+      request<{ status: string; caseStats: CaseStats }>('/admin/case-stats'),
 
     // Payment requests (manual confirmation)
     getPayments: (params?: { status?: string; page?: number }) => {
@@ -538,6 +542,18 @@ export interface RevenueAnalytics {
   daily: { date: string; total: number; count: number }[]
 }
 
+export interface CaseStats {
+  total: number
+  premium: number
+  emergency: number
+  diagnostika: number
+  jarrohlik: number
+  byType: { type: string; count: number }[]
+  byCategory: { category: string; count: number; avgDifficulty: number }[]
+  byDifficulty: { level: number; count: number }[]
+  byStatus: { status: string; count: number }[]
+}
+
 export interface ServerHealth {
   healthLevel: 'healthy' | 'busy' | 'critical'
   uptimeSeconds: number
@@ -651,6 +667,7 @@ export interface BackendUser {
   university?: string
   isPremium: boolean
   hasPassword: boolean
+  authProvider?: 'google' | 'email'
   stats: {
     totalCases: number
     avgScore: number

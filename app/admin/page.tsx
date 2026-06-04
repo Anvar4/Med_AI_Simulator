@@ -4,7 +4,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { AdminCategory, AdminStats, api, BackendCase, BackendUser, PaymentRequestRow, PromoCode, RevenueAnalytics, ServerHealth } from '@/lib/api';
+import { AdminCategory, AdminStats, api, BackendCase, BackendUser, CaseStats, PaymentRequestRow, PromoCode, RevenueAnalytics, ServerHealth } from '@/lib/api';
 import { canAccessAdmin, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -23,6 +23,7 @@ import {
 	Search,
 	Server,
 	Shield,
+	Star,
 	Tag,
 	Trash2,
 	UserPlus,
@@ -298,6 +299,7 @@ export default function AdminPage() {
 	const [statsLoading, setStatsLoading] = useState(false)
 	const [revenue, setRevenue] = useState<RevenueAnalytics | null>(null)
 	const [serverHealth, setServerHealth] = useState<ServerHealth | null>(null)
+	const [caseStats, setCaseStats] = useState<CaseStats | null>(null)
 
 	// Payments state
 	const [payments, setPayments] = useState<PaymentRequestRow[]>([])
@@ -315,6 +317,7 @@ export default function AdminPage() {
 	const [userTotalPages, setUserTotalPages] = useState(1)
 	const [userSearch, setUserSearch] = useState('')
 	const [userRole, setUserRole] = useState('')
+	const [userProvider, setUserProvider] = useState('')
 	const [usersLoading, setUsersLoading] = useState(false)
 	const [userModal, setUserModal] = useState<BackendUser | null | 'new'>(null)
 	const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -335,6 +338,7 @@ export default function AdminPage() {
 	const [promoTotal, setPromoTotal] = useState(0)
 	const [promoPage, setPromoPage] = useState(1)
 	const [promoTypeFilter, setPromoTypeFilter] = useState('')
+	const [promoStatusFilter, setPromoStatusFilter] = useState('') // '' | 'used' | 'unused' | 'active'
 	const [promoLoading, setPromoLoading] = useState(false)
 	const [showPromoModal, setShowPromoModal] = useState(false)
 	const [generatedCodes, setGeneratedCodes] = useState<PromoCode[]>([])
@@ -350,16 +354,18 @@ export default function AdminPage() {
 	const loadDashboard = useCallback(async () => {
 		setStatsLoading(true)
 		try {
-			const [statsRes, actRes, revRes, healthRes] = await Promise.all([
+			const [statsRes, actRes, revRes, healthRes, csRes] = await Promise.all([
 				api.admin.getSystemStats(),
 				api.admin.getRecentActivity(),
 				api.admin.getRevenue().catch(() => null),
 				api.admin.getServerHealth().catch(() => null),
+				api.admin.getCaseStats().catch(() => null),
 			])
 			setStats(statsRes.stats)
 			setRecentUsers(actRes.recentUsers ?? [])
 			if (revRes) setRevenue(revRes.revenue)
 			if (healthRes) setServerHealth(healthRes.server)
+			if (csRes) setCaseStats(csRes.caseStats)
 		} catch {
 			// silent
 		} finally {
@@ -368,10 +374,10 @@ export default function AdminPage() {
 	}, [])
 
 	// Load users
-	const loadUsers = useCallback(async (page: number, search: string, role: string) => {
+	const loadUsers = useCallback(async (page: number, search: string, role: string, provider: string) => {
 		setUsersLoading(true)
 		try {
-			const res = await api.admin.getUsers({ search: search || undefined, role: role || undefined, page, limit: 15 })
+			const res = await api.admin.getUsers({ search: search || undefined, role: role || undefined, provider: provider || undefined, page, limit: 15 })
 			setUsers(res.users)
 			setUserTotal(res.total)
 			setUserTotalPages(res.totalPages)
@@ -431,7 +437,7 @@ export default function AdminPage() {
 		}, 10000)
 		return () => clearInterval(id)
 	}, [tab])
-	useEffect(() => { if (tab === 'users') loadUsers(userPage, userSearch, userRole) }, [tab, userPage, userRole, loadUsers, userSearch])
+	useEffect(() => { if (tab === 'users') loadUsers(userPage, userSearch, userRole, userProvider) }, [tab, userPage, userRole, userProvider, loadUsers, userSearch])
 	useEffect(() => { if (tab === 'promo') loadPromoCodes(promoPage, promoTypeFilter) }, [tab, promoPage, promoTypeFilter, loadPromoCodes])
 	useEffect(() => { if (tab === 'categories') loadCategories() }, [tab, loadCategories])
 	useEffect(() => { if (tab === 'payments') loadPayments(paymentStatusFilter) }, [tab, paymentStatusFilter, loadPayments])
@@ -464,14 +470,14 @@ export default function AdminPage() {
 		setUserSearch(v)
 		setUserPage(1)
 		if (searchTimeout.current) clearTimeout(searchTimeout.current)
-		searchTimeout.current = setTimeout(() => loadUsers(1, v, userRole), 400)
+		searchTimeout.current = setTimeout(() => loadUsers(1, v, userRole, userProvider), 400)
 	}
 
 	async function handleDeleteUser(id: string) {
 		try {
 			await api.admin.deleteUser(id)
 			setDeleteConfirm(null)
-			loadUsers(userPage, userSearch, userRole)
+			loadUsers(userPage, userSearch, userRole, userProvider)
 		} catch {
 			// silent
 		}
@@ -684,6 +690,74 @@ export default function AdminPage() {
 										</div>
 									)}
 
+									{/* ── Clinical-case breakdown (real, from DB) ── */}
+									{caseStats && (
+										<div>
+											<div className='flex items-center gap-2 mb-3'>
+												<BookOpen className='w-5 h-5 text-primary' />
+												<h3 className='text-lg font-semibold text-text-primary'>Klinik holatlar statistikasi</h3>
+											</div>
+											<div className='grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4'>
+												{[
+													{ label: 'Jami klinik holatlar', value: caseStats.total, color: 'text-primary' },
+													{ label: 'Shoshilinch holatlar', value: caseStats.emergency, color: 'text-accent' },
+													{ label: 'Diagnostika', value: caseStats.diagnostika, color: 'text-success' },
+													{ label: 'Premium holatlar', value: caseStats.premium, color: 'text-warning' },
+												].map(s => (
+													<Card key={s.label} hover={false}>
+														<p className='text-xs text-text-secondary mb-1'>{s.label}</p>
+														<p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+													</Card>
+												))}
+											</div>
+											<div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+												{/* By difficulty (stars) */}
+												<Card hover={false}>
+													<p className='text-sm font-semibold text-text-primary mb-3'>Qiyinlik darajalari bo&apos;yicha</p>
+													<div className='space-y-2'>
+														{caseStats.byDifficulty.map(d => {
+															const max = Math.max(...caseStats.byDifficulty.map(x => x.count), 1)
+															return (
+																<div key={d.level} className='flex items-center gap-2'>
+																	<span className='flex gap-0.5 w-24 shrink-0'>
+																		{[1, 2, 3, 4, 5].map(i => (
+																			<Star key={i} className={`w-3 h-3 ${i <= d.level ? 'fill-warning text-warning' : 'text-text-secondary/30'}`} />
+																		))}
+																	</span>
+																	<div className='flex-1 h-2 rounded-full bg-surface-light overflow-hidden'>
+																		<div className='h-full bg-primary' style={{ width: `${(d.count / max) * 100}%` }} />
+																	</div>
+																	<span className='text-xs text-text-secondary w-8 text-right'>{d.count}</span>
+																</div>
+															)
+														})}
+													</div>
+												</Card>
+												{/* By category (specialty/yo'nalish) */}
+												<Card hover={false}>
+													<p className='text-sm font-semibold text-text-primary mb-3'>Yo&apos;nalishlar bo&apos;yicha</p>
+													{caseStats.byCategory.length === 0 ? (
+														<p className='text-sm text-text-secondary'>Ma&apos;lumot yo&apos;q</p>
+													) : (
+														<div className='space-y-2 max-h-48 overflow-y-auto'>
+															{caseStats.byCategory.map(c => (
+																<div key={c.category} className='flex items-center justify-between text-sm'>
+																	<span className='text-text-primary'>{c.category}</span>
+																	<span className='text-text-secondary inline-flex items-center gap-2'>
+																		<span className='inline-flex items-center gap-0.5 text-warning'>
+																			<Star className='w-3 h-3 fill-warning' /> {c.avgDifficulty}
+																		</span>
+																		<span className='font-semibold text-text-primary'>{c.count}</span>
+																	</span>
+																</div>
+															))}
+														</div>
+													)}
+												</Card>
+											</div>
+										</div>
+									)}
+
 									{/* Extra stats */}
 									{stats && (
 										<div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
@@ -768,6 +842,12 @@ export default function AdminPage() {
 										<option value='instructor'>Content Manager</option>
 										<option value='admin'>Admin</option>
 									</select>
+									<select value={userProvider} onChange={e => { setUserProvider(e.target.value); setUserPage(1) }}
+										className='bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50'>
+										<option value=''>Barcha kirish usullari</option>
+										<option value='google'>Google orqali</option>
+										<option value='email'>Email orqali</option>
+									</select>
 									<Button size='sm' onClick={() => setUserModal('new')}>
 										<Plus className='w-4 h-4' /> Qo‘shish
 									</Button>
@@ -801,7 +881,12 @@ export default function AdminPage() {
 																	{(u.firstName?.[0] ?? u.name[0] ?? '?').toUpperCase()}
 																</div>
 																<div>
-																	<p className='font-medium text-text-primary leading-tight'>{u.name}</p>
+																	<div className='flex items-center gap-1.5'>
+																		<p className='font-medium text-text-primary leading-tight'>{u.name}</p>
+																		<span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${u.authProvider === 'google' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>
+																			{u.authProvider === 'google' ? 'Google' : 'Email'}
+																		</span>
+																	</div>
 																	<p className='text-xs text-text-secondary'>{u.email}</p>
 																</div>
 															</div>
@@ -1096,6 +1181,13 @@ export default function AdminPage() {
 									<option value='clinic'>Klinika</option>
 									<option value='university'>Universitet</option>
 								</select>
+								<select value={promoStatusFilter} onChange={e => setPromoStatusFilter(e.target.value)}
+									className='bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50'>
+									<option value=''>Barcha holatlar</option>
+									<option value='unused'>Ishlatilmagan</option>
+									<option value='used'>Ishlatilgan</option>
+									<option value='active'>Faol</option>
+								</select>
 								<div className='flex gap-2 ml-auto'>
 									<a href={api.admin.exportPromoCodesUrl(promoTypeFilter || undefined)} download
 										className='flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-light border border-border text-sm text-text-secondary hover:text-text-primary transition-colors'>
@@ -1152,7 +1244,13 @@ export default function AdminPage() {
 												</tr>
 											</thead>
 											<tbody>
-												{promoCodes.map(c => (
+												{promoCodes.filter(c => {
+													const used = (c.usedCount ?? 0) > 0
+													if (promoStatusFilter === 'used') return used
+													if (promoStatusFilter === 'unused') return !used
+													if (promoStatusFilter === 'active') return c.isActive
+													return true
+												}).map(c => (
 													<tr key={c._id} className='border-b border-border/50 hover:bg-surface-light transition-colors'>
 														<td className='py-3 px-2'>
 															<button onClick={() => handleCopy(c.code)}
@@ -1212,7 +1310,7 @@ export default function AdminPage() {
 					<UserModal
 						user={userModal === 'new' ? null : userModal}
 						onClose={() => setUserModal(null)}
-						onSave={() => { setUserModal(null); loadUsers(userPage, userSearch, userRole) }}
+						onSave={() => { setUserModal(null); loadUsers(userPage, userSearch, userRole, userProvider) }}
 					/>
 				)}
 				{showPromoModal && (

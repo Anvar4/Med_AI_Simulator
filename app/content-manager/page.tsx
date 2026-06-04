@@ -19,6 +19,7 @@ import {
     Loader2,
     Plus,
     Search,
+    Star,
     Tag,
     Trash2,
     Upload,
@@ -31,6 +32,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const fadeIn = {
 	hidden: { opacity: 0, y: 20 },
 	visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+}
+
+// Difficulty (1-5 stars) human labels
+const DIFFICULTY_LABELS: Record<number, string> = {
+	1: 'Juda oson',
+	2: 'Oson',
+	3: 'O\'rta',
+	4: 'Qiyin',
+	5: 'Juda qiyin',
 }
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'default' }> = {
@@ -438,9 +448,21 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 
 					<div className='grid grid-cols-3 gap-3'>
 						<div>
-							<label className='text-xs text-text-secondary mb-1 block'>Qiyinlik (1-5)</label>
-							<input type='number' min={1} max={5} value={form.difficulty} onChange={e => set('difficulty', +e.target.value)}
-								className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50' />
+							<label className='text-xs text-text-secondary mb-1 block'>Qiyinlik darajasi</label>
+							<div className='flex items-center gap-1 h-[38px]'>
+								{[1, 2, 3, 4, 5].map(star => (
+									<button
+										key={star}
+										type='button'
+										onClick={() => set('difficulty', star)}
+										title={DIFFICULTY_LABELS[star]}
+										className='p-0.5 transition-transform hover:scale-110'
+									>
+										<Star className={`w-5 h-5 ${star <= form.difficulty ? 'fill-warning text-warning' : 'text-text-secondary/40'}`} />
+									</button>
+								))}
+								<span className='ml-2 text-xs text-text-secondary'>{DIFFICULTY_LABELS[form.difficulty]}</span>
+							</div>
 						</div>
 						<div>
 							<label className='text-xs text-text-secondary mb-1 block'>Holat</label>

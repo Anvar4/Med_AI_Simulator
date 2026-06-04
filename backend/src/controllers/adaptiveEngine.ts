@@ -14,9 +14,12 @@
 
 export type Level = 1 | 2 | 3
 
-export const MASTERY_SCORE = 75 // avg score needed to advance
-export const MIN_ATTEMPTS_TO_ADVANCE = 2 // attempts at a level before it counts
-export const STRUGGLING_SCORE = 50 // below this -> needs reinforcement
+// Passing threshold: a learner must score at least 60 to clear a level and
+// unlock the next. Below 60 they stay on the current level (reinforcement).
+export const PASS_SCORE = 60
+export const MASTERY_SCORE = 60 // avg score needed to advance to the next level
+export const MIN_ATTEMPTS_TO_ADVANCE = 1 // a single passing attempt unlocks the next level
+export const STRUGGLING_SCORE = 60 // below this -> needs reinforcement, stay on level
 
 /** Map a raw case difficulty (1–5) to a learning level (1–3). */
 export function difficultyToLevel(difficulty: number): Level {
