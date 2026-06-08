@@ -40,8 +40,8 @@ export default function PrivacyPolicyPage() {
           </Section>
 
           <div className='pt-4 border-t border-border text-xs'>
-            Savollar bo&apos;lsa: Telefon <span className='text-text-primary'>+998976402004</span> · Telegram{' '}
-            <a href='https://t.me/KUCHAROVaNVAR' target='_blank' rel='noopener noreferrer' className='text-primary hover:underline'>@KUCHAROVaNVAR</a>
+            Savollar bo&apos;lsa: Telegram{' '}
+            <a href='https://t.me/AnvarKucharov' target='_blank' rel='noopener noreferrer' className='text-primary hover:underline'>@AnvarKucharov</a>
           </div>
         </div>
       </div>

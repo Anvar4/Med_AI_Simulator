@@ -5,13 +5,13 @@ import BalanceTopUpModal from '@/components/subscription/BalanceTopUpModal'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Building2, Check, CheckCircle, Clock, CreditCard, History, Loader2, Phone, Send, Wallet } from 'lucide-react'
+import { Building2, Check, CheckCircle, Clock, CreditCard, History, Loader2, Send, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
 
-const CONTACT = { phone: '+998 97 640 20 04', phoneRaw: '+998976402004', telegram: '@KucharovAnvar' }
+const CONTACT = { telegram: '@AnvarKucharov' }
 
 interface BalanceInfo {
   balance: number
@@ -154,9 +154,6 @@ export default function SubscriptionPage() {
                   <p className='text-2xl font-bold text-text-primary mt-2'>Kelishilgan holda</p>
                   <p className='text-xs text-text-secondary mt-1'>Tashkilotlar uchun maxsus tarif</p>
                   <div className='mt-4 space-y-2 text-sm flex-1'>
-                    <a href={`tel:${CONTACT.phoneRaw}`} className='flex items-center gap-2 text-text-primary hover:text-primary'>
-                      <Phone className='w-4 h-4 text-primary' /> {CONTACT.phone}
-                    </a>
                     <a href={`https://t.me/${CONTACT.telegram.replace('@', '')}`} target='_blank' rel='noopener noreferrer' className='flex items-center gap-2 text-text-primary hover:text-primary'>
                       <Send className='w-4 h-4 text-primary' /> {CONTACT.telegram}
                     </a>

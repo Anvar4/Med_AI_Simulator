@@ -6,6 +6,8 @@ import { useToast } from '@/lib/toast-context'
 import {
   CheckCircle2,
   Clock,
+  FileText,
+  ImageIcon,
   Inbox,
   Loader2,
   Mail,
@@ -75,6 +77,13 @@ export default function AdminSupportTab() {
     setBusy(id)
     try { await api.admin.deleteTicket(id); toast.success('O\'chirildi'); loadTickets(filter); loadStats() }
     catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') } finally { setBusy(null) }
+  }
+
+  async function openAttachment(ticketId: string, index: number) {
+    try {
+      const res = await api.admin.getTicketAttachment(ticketId, index)
+      window.open(res.url, '_blank', 'noopener,noreferrer')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Faylni ochib bo\'lmadi') }
   }
 
   const FILTERS = [
@@ -155,7 +164,20 @@ export default function AdminSupportTab() {
                 )}
 
                 {/* Message */}
-                <p className='text-sm text-text-primary bg-surface-light/50 rounded-xl px-3 py-2'>{t.message}</p>
+                {t.message && <p className='text-sm text-text-primary bg-surface-light/50 rounded-xl px-3 py-2'>{t.message}</p>}
+
+                {/* Attachments (photos / documents from the bot) */}
+                {t.attachments && t.attachments.length > 0 && (
+                  <div className='flex flex-wrap gap-2 mt-2'>
+                    {t.attachments.map((a, i) => (
+                      <button key={i} onClick={() => openAttachment(t._id, i)}
+                        className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20'>
+                        {a.type === 'photo' ? <ImageIcon className='w-3.5 h-3.5' /> : <FileText className='w-3.5 h-3.5' />}
+                        {a.type === 'photo' ? 'Rasmni ochish' : (a.fileName || 'Faylni ochish')}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Replies */}
                 {t.replies.length > 0 && (

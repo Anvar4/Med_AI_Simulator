@@ -24,6 +24,7 @@ import {
     deleteTicket,
     getSupportStats,
     getSupportTickets,
+    getTicketAttachment,
     replyToTicket,
     updateTicketStatus,
 } from '../controllers/supportController'
@@ -60,6 +61,7 @@ router.get('/referrals', getReferralAnalytics)
 // Support tickets (from the Telegram support bot)
 router.get('/support/stats', getSupportStats)
 router.get('/support/tickets', getSupportTickets)
+router.get('/support/tickets/:id/attachment/:index', getTicketAttachment)
 router.patch('/support/tickets/:id', updateTicketStatus)
 router.post('/support/tickets/:id/reply', replyToTicket)
 router.delete('/support/tickets/:id', deleteTicket)

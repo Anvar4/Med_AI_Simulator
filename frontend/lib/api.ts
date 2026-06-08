@@ -284,6 +284,8 @@ export const api = {
       request<{ status: string; delivered: boolean; message: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}/reply`, { method: 'POST', body: JSON.stringify({ text }) }),
     deleteTicket: (id: string) =>
       request<{ status: string; message: string }>(`/admin/support/tickets/${id}`, { method: 'DELETE' }),
+    getTicketAttachment: (id: string, index: number) =>
+      request<{ status: string; url: string; type: 'photo' | 'document'; fileName?: string }>(`/admin/support/tickets/${id}/attachment/${index}`),
 
     // Payment requests (manual confirmation)
     getPayments: (params?: { status?: string; page?: number }) => {
@@ -1050,6 +1052,13 @@ export interface TicketReply {
   createdAt: string
 }
 
+export interface TicketAttachment {
+  type: 'photo' | 'document'
+  fileId: string
+  fileName?: string
+  caption?: string
+}
+
 export interface SupportTicket {
   _id: string
   telegramId: string
@@ -1059,6 +1068,7 @@ export interface SupportTicket {
   user?: { _id: string; name: string; email: string; username?: string; phone?: string; avatar?: string; isPremium?: boolean; role?: string } | null
   category?: string
   message: string
+  attachments: TicketAttachment[]
   status: 'open' | 'in_progress' | 'resolved'
   replies: TicketReply[]
   resolvedAt?: string

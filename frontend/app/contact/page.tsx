@@ -4,15 +4,13 @@ import Sidebar from '@/components/layout/Sidebar'
 import { useAuth } from '@/lib/auth-context'
 import { useT } from '@/lib/language-context'
 import { motion } from 'framer-motion'
-import { Bot, Clock, Mail, Phone, Send } from 'lucide-react'
+import { Bot, Clock, Mail, Send } from 'lucide-react'
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
 
 // Central contact details (kept in sync with the subscription page).
 const CONTACT = {
-  phone: '+998 97 640 20 04',
-  phoneRaw: '+998976402004',
-  telegram: '@KucharovAnvar',
+  telegram: '@AnvarKucharov',
   email: 'support@medaisimulator.uz',
   supportBot: 'Med_AI_Simulator_Supportbot',
 }
@@ -52,14 +50,6 @@ export default function ContactPage() {
 
       {/* Other channels */}
       <motion.div initial='hidden' animate='visible' variants={fadeIn} className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-        <a href={`tel:${CONTACT.phoneRaw}`} className='glass border border-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/40 transition-colors'>
-          <Phone className='w-5 h-5 text-primary shrink-0' />
-          <div className='min-w-0'>
-            <p className='text-xs text-text-secondary'>{t('contact.phone')}</p>
-            <p className='text-sm font-semibold text-text-primary truncate'>{CONTACT.phone}</p>
-          </div>
-        </a>
-
         <a href={`https://t.me/${CONTACT.telegram.replace('@', '')}`} target='_blank' rel='noopener noreferrer'
           className='glass border border-border rounded-2xl p-4 flex items-center gap-3 hover:border-primary/40 transition-colors'>
           <Send className='w-5 h-5 text-primary shrink-0' />

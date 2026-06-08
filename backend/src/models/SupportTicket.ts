@@ -8,6 +8,13 @@ import mongoose, { Document, Schema } from 'mongoose'
  */
 export type TicketStatus = 'open' | 'in_progress' | 'resolved'
 
+export interface ITicketAttachment {
+  type: 'photo' | 'document'
+  fileId: string        // Telegram file_id (used to re-send/serve)
+  fileName?: string
+  caption?: string
+}
+
 export interface ITicketReply {
   fromAdmin: boolean
   text: string
@@ -24,6 +31,7 @@ export interface ISupportTicket extends Document {
   user?: mongoose.Types.ObjectId
   category?: string            // optional FAQ/topic category chosen in the bot
   message: string
+  attachments: ITicketAttachment[]
   status: TicketStatus
   replies: ITicketReply[]
   resolvedBy?: mongoose.Types.ObjectId
@@ -31,6 +39,16 @@ export interface ISupportTicket extends Document {
   createdAt: Date
   updatedAt: Date
 }
+
+const attachmentSchema = new Schema<ITicketAttachment>(
+  {
+    type: { type: String, enum: ['photo', 'document'], required: true },
+    fileId: { type: String, required: true },
+    fileName: { type: String },
+    caption: { type: String },
+  },
+  { _id: false }
+)
 
 const replySchema = new Schema<ITicketReply>(
   {
@@ -49,7 +67,8 @@ const supportTicketSchema = new Schema<ISupportTicket>(
     chatId: { type: String, required: true },
     user: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     category: { type: String },
-    message: { type: String, required: true },
+    message: { type: String, default: '' },
+    attachments: { type: [attachmentSchema], default: [] },
     status: { type: String, enum: ['open', 'in_progress', 'resolved'], default: 'open', index: true },
     replies: { type: [replySchema], default: [] },
     resolvedBy: { type: Schema.Types.ObjectId, ref: 'User' },

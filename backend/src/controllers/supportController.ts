@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { AuthRequest } from '../middleware/auth'
 import { SupportTicket } from '../models/SupportTicket'
-import { sendSupportReply } from '../services/supportBot'
+import { getTelegramFileUrl, sendSupportReply } from '../services/supportBot'
 
 /**
  * GET /api/admin/support/stats — ticket counts by status for the dashboard.
@@ -107,6 +107,26 @@ export const replyToTicket = async (req: AuthRequest, res: Response): Promise<vo
       message: delivered ? 'Javob yuborildi' : 'Javob saqlandi (bot orqali yetkazib bo\'lmadi)',
       ticket: populated,
     })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+/**
+ * GET /api/admin/support/tickets/:id/attachment/:index — resolve a Telegram
+ * attachment to a temporary downloadable URL (Telegram file links expire, so
+ * this is resolved on demand). Returns { url }.
+ */
+export const getTicketAttachment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const ticket = await SupportTicket.findById(req.params.id)
+    if (!ticket) { res.status(404).json({ message: 'Murojaat topilmadi' }); return }
+    const idx = Number(req.params.index)
+    const att = ticket.attachments[idx]
+    if (!att) { res.status(404).json({ message: 'Fayl topilmadi' }); return }
+    const url = await getTelegramFileUrl(att.fileId)
+    if (!url) { res.status(502).json({ message: 'Faylni olishda xatolik' }); return }
+    res.json({ status: 'success', url, type: att.type, fileName: att.fileName })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }
