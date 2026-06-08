@@ -3,6 +3,7 @@ import { BalanceTopUp } from '../models/BalanceTopUp'
 import { TelegramAdmin } from '../models/TelegramAdmin'
 import { User } from '../models/User'
 import { approveTopUp, rejectTopUp } from './balanceService'
+import { getBot } from './botInstance'
 
 /**
  * Telegram bot for manual balance-top-up approval (polling mode).
@@ -18,6 +19,12 @@ import { approveTopUp, rejectTopUp } from './balanceService'
 let bot: TelegramBot | null = null
 // Pending "awaiting reject reason" state, keyed by admin telegram chat id.
 const awaitingReason = new Map<number, string>() // chatId -> topUpId
+
+/** True when this admin chat is mid "type the rejection reason" flow. Used by
+ *  the support bot so it doesn't treat a rejection reason as a support reply. */
+export function isAwaitingRejectReason(chatId: number | string): boolean {
+  return awaitingReason.has(Number(chatId))
+}
 
 function envAdminIds(): string[] {
   return (process.env.TELEGRAM_ADMIN_IDS || '')
@@ -154,43 +161,50 @@ async function notifyUserDecisionInTelegram(userId: string, text: string) {
   if (user?.telegramId) await sendToUser(user.telegramId, text)
 }
 
-/** Initialize the bot in polling mode. No-op when no token is configured. */
+/**
+ * Attach the payment-approval handlers to the SHARED bot instance. Both this
+ * and the support bot use one bot/token/polling connection, so handlers must be
+ * scoped to their own callback prefixes (approve/reject/noop here) and their
+ * own message state (awaitingReason) to avoid clashing with support handlers.
+ */
 export function initTelegramBot(): void {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  if (!token) {
-    console.log('Telegram bot: TELEGRAM_BOT_TOKEN yo\'q — bot o\'chiq')
+  const shared = getBot()
+  if (!shared) {
+    console.log('Telegram bot: token yo\'q — to\'lov boti o\'chiq')
     return
   }
-  bot = new TelegramBot(token, { polling: true })
-  console.log('Telegram bot ishga tushdi (polling)')
+  bot = shared
+  console.log('To\'lov boti ulandi (umumiy instans)')
 
+  // NOTE: /start is owned by the support bot (it shows the full menu and also
+  // registers admins). We only register the admin record here on /start so that
+  // payment notifications reach them.
   bot.onText(/^\/start/, async (m) => {
     const chatId = m.chat.id
     if (await isAdmin(chatId)) {
-      // Register/refresh the admin record.
       await TelegramAdmin.findOneAndUpdate(
         { telegramId: String(chatId) },
         { telegramId: String(chatId), username: m.from?.username, fullName: [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' '), isActive: true },
         { upsert: true }
       )
-      bot!.sendMessage(chatId, '✅ Admin sifatida tan olindingiz. Yangi to\'lov arizalari shu yerga keladi.')
-    } else {
-      bot!.sendMessage(chatId, 'Salom! Bu Med AI Simulator to\'lov boti. Bu bot faqat adminlar uchun.')
     }
   })
 
-  // Inline button presses.
+  // Inline button presses — only the payment actions (approve/reject/noop).
   bot.on('callback_query', async (q) => {
     const chatId = q.message?.chat.id
     const data = q.data || ''
     if (!chatId) return
+
+    const [action, id] = data.split(':')
+    // Ignore callbacks that belong to the support bot (faq/reply/resolve).
+    if (!['approve', 'reject', 'noop'].includes(action)) return
 
     if (!(await isAdmin(chatId))) {
       bot!.answerCallbackQuery(q.id, { text: 'Faqat adminlar uchun', show_alert: true })
       return
     }
 
-    const [action, id] = data.split(':')
     if (action === 'noop') { bot!.answerCallbackQuery(q.id); return }
 
     if (action === 'approve') {

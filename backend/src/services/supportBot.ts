@@ -1,6 +1,8 @@
 import TelegramBot from 'node-telegram-bot-api'
 import { ITicketAttachment, SupportTicket } from '../models/SupportTicket'
 import { User } from '../models/User'
+import { getBot, getBotToken } from './botInstance'
+import { isAwaitingRejectReason } from './telegramBot'
 
 /**
  * User-facing support bot (@Med_AI_Simulator_Supportbot).
@@ -82,14 +84,14 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export function initSupportBot(): void {
-  const token = process.env.SUPPORT_BOT_TOKEN
-  if (!token) {
-    console.log('Support bot: SUPPORT_BOT_TOKEN yo\'q — bot o\'chiq')
+  const shared = getBot()
+  if (!shared) {
+    console.log('Support bot: token yo\'q — bot o\'chiq')
     return
   }
 
-  bot = new TelegramBot(token, { polling: true })
-  console.log('Support bot ishga tushdi (polling)')
+  bot = shared
+  console.log('Support bot ulandi (umumiy instans)')
 
   bot.onText(/^\/start/, (m) => {
     const chatId = String(m.chat.id)
@@ -150,6 +152,10 @@ export function initSupportBot(): void {
 
     // Ignore commands here (handled by onText above).
     if (text.startsWith('/')) return
+
+    // The payment bot is waiting for this admin to type a rejection reason —
+    // let it handle that message; the support bot must not intercept it.
+    if (isAwaitingRejectReason(chatId)) return
 
     // ── Admin reply flow ──
     if (adminReplyTo.has(chatId) && isAdminChat(chatId)) {
@@ -324,7 +330,7 @@ export async function sendSupportReply(chatId: string, text: string): Promise<bo
 
 /** Build a temporary public URL for a Telegram file (used by the admin panel to show images). */
 export async function getTelegramFileUrl(fileId: string): Promise<string | null> {
-  const token = process.env.SUPPORT_BOT_TOKEN
+  const token = getBotToken()
   if (!bot || !token) return null
   try {
     const file = await bot.getFile(fileId)
