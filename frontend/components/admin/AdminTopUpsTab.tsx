@@ -1,6 +1,8 @@
 'use client'
 
 import { AdminTopUp, api } from '@/lib/api'
+import { useDialog } from '@/lib/dialog-context'
+import { useToast } from '@/lib/toast-context'
 import { Check, ExternalLink, Wallet, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -11,6 +13,8 @@ function receiptHref(url: string): string {
 }
 
 export default function AdminTopUpsTab() {
+  const toast = useToast()
+  const dialog = useDialog()
   const [topups, setTopups] = useState<AdminTopUp[]>([])
   const [status, setStatus] = useState('pending')
   const [loading, setLoading] = useState(false)
@@ -24,13 +28,13 @@ export default function AdminTopUpsTab() {
 
   async function approve(id: string) {
     setBusy(id)
-    try { await api.paymentAdmin.approveTopUp(id); load(status) } catch (e) { alert(e instanceof Error ? e.message : 'Xatolik') } finally { setBusy(null) }
+    try { await api.paymentAdmin.approveTopUp(id); toast.success('Ariza tasdiqlandi'); load(status) } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') } finally { setBusy(null) }
   }
   async function reject(id: string) {
-    const reason = prompt('Rad etish sababini yozing:')
+    const reason = await dialog.prompt({ title: 'Arizani rad etish', message: 'Rad etish sababini yozing:', placeholder: 'Sabab...', confirmText: 'Rad etish' })
     if (!reason) return
     setBusy(id)
-    try { await api.paymentAdmin.rejectTopUp(id, reason); load(status) } catch (e) { alert(e instanceof Error ? e.message : 'Xatolik') } finally { setBusy(null) }
+    try { await api.paymentAdmin.rejectTopUp(id, reason); toast.success('Ariza rad etildi'); load(status) } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') } finally { setBusy(null) }
   }
 
   return (

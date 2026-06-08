@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 const fadeIn = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
 
-const CONTACT = { phone: '+998 96 402 00 04', phoneRaw: '+99896402004', telegram: '@KucharovAnvar' }
+const CONTACT = { phone: '+998 97 640 20 04', phoneRaw: '+998976402004', telegram: '@KucharovAnvar' }
 
 interface BalanceInfo {
   balance: number

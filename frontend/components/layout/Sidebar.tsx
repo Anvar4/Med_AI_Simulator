@@ -19,6 +19,7 @@ import {
     Home,
     LogOut,
     Menu,
+    MessageCircle,
     PlayCircle,
     Settings,
     Shield,
@@ -57,6 +58,7 @@ export default function Sidebar() {
 			)
 		}
 		items.push({ href: '/subscription', icon: CreditCard, label: t('nav.subscription') })
+		items.push({ href: '/contact', icon: MessageCircle, label: t('nav.contact') })
 		if (user && canAccessContentManager(user.role)) {
 			items.push({ href: '/content-manager', icon: UserCog, label: t('nav.content') })
 		}

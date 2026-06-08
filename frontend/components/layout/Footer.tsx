@@ -22,7 +22,9 @@ export default function Footer() {
 						</p>
 						<div className='flex gap-4 mt-5'>
 							<a
-								href='#'
+								href='https://t.me/Med_AI_Simulator_Supportbot'
+								target='_blank'
+								rel='noopener noreferrer'
 								className='w-10 h-10 bg-surface-light rounded-xl flex items-center justify-center text-text-secondary hover:text-primary hover:bg-primary/10 transition-all'
 								aria-label='Telegram'
 							>
@@ -109,36 +111,38 @@ export default function Footer() {
 						</h4>
 						<ul className='space-y-3'>
 							<li>
-								<a
-									href='#'
-									className='text-sm text-text-secondary hover:text-primary transition-colors'
-								>
-									Biz haqimizda
-								</a>
-							</li>
-							<li>
-								<a
-									href='#'
-									className='text-sm text-text-secondary hover:text-primary transition-colors'
-								>
-									Blog
-								</a>
-							</li>
-							<li>
-								<a
-									href='#'
+								<Link
+									href='/contact'
 									className='text-sm text-text-secondary hover:text-primary transition-colors'
 								>
 									Bog&apos;lanish
-								</a>
+								</Link>
 							</li>
 							<li>
 								<a
-									href='#'
+									href='https://t.me/Med_AI_Simulator_Supportbot'
+									target='_blank'
+									rel='noopener noreferrer'
+									className='text-sm text-text-secondary hover:text-primary transition-colors'
+								>
+									Qo&apos;llab-quvvatlash
+								</a>
+							</li>
+							<li>
+								<Link
+									href='/privacy-policy'
 									className='text-sm text-text-secondary hover:text-primary transition-colors'
 								>
 									Maxfiylik siyosati
-								</a>
+								</Link>
+							</li>
+							<li>
+								<Link
+									href='/payment-terms'
+									className='text-sm text-text-secondary hover:text-primary transition-colors'
+								>
+									To&apos;lov shartlari
+								</Link>
 							</li>
 						</ul>
 					</div>

@@ -4,6 +4,7 @@
 import Button from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { backendUserToAuth, useAuth } from '@/lib/auth-context';
+import { useToast } from '@/lib/toast-context';
 import { useGoogleLogin } from '@react-oauth/google';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -25,10 +26,11 @@ type Step = 'method' | 'personal' | 'credentials' | 'email' | 'otp'
 
 function AvatarUpload({ value, onChange }: { value: string; onChange: (b64: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 3 * 1024 * 1024) { alert('Rasm hajmi 3 MB dan oshmasligi kerak'); return }
+    if (file.size > 3 * 1024 * 1024) { toast.error('Rasm hajmi 3 MB dan oshmasligi kerak'); return }
     const reader = new FileReader()
     reader.onload = ev => onChange(ev.target?.result as string)
     reader.readAsDataURL(file)

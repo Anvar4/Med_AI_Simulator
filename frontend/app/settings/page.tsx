@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
+import { useToast } from '@/lib/toast-context';
 import { Locale } from '@/lib/i18n';
 import { useTtsEnabled } from '@/lib/use-tts';
 import { useTheme } from '@/lib/theme-context';
@@ -72,6 +73,7 @@ function OtpRow({
 
 export default function SettingsPage() {
 	const { user, updateUser } = useAuth()
+	const toast = useToast()
 	const { theme, setTheme } = useTheme()
 	const { setLocale } = useT()
 	const [ttsEnabled, setTtsEnabled] = useTtsEnabled()
@@ -299,7 +301,7 @@ export default function SettingsPage() {
 								</button>
 								<input id='settings-avatar-input' type='file' accept='image/*' className='hidden' onChange={e => {
 									const file = e.target.files?.[0]; if (!file) return
-									if (file.size > 3 * 1024 * 1024) { alert('Max 3 MB'); return }
+									if (file.size > 3 * 1024 * 1024) { toast.error('Rasm hajmi 3 MB dan oshmasligi kerak'); return }
 									const reader = new FileReader(); reader.onload = ev => setProfileAvatar(ev.target?.result as string); reader.readAsDataURL(file)
 								}} />
 								<div>

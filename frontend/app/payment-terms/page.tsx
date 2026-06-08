@@ -36,7 +36,7 @@ export default function PaymentTermsPage() {
           </Section>
 
           <div className='pt-4 border-t border-border text-xs'>
-            Qo&apos;llab-quvvatlash: Telefon <span className='text-text-primary'>+99896402004</span> · Telegram{' '}
+            Qo&apos;llab-quvvatlash: Telefon <span className='text-text-primary'>+998976402004</span> · Telegram{' '}
             <a href='https://t.me/KucharovAnvar' target='_blank' rel='noopener noreferrer' className='text-primary hover:underline'>@KucharovAnvar</a>
           </div>
         </div>

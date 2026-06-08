@@ -305,6 +305,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'stats.monthly': 'Oylik faollik',
     'stats.scoreDistribution': 'Ball taqsimoti',
     'stats.noData': 'Ma\'lumot yo\'q',
+
+    // Beta banner
+    'beta.message': 'Sayt beta versiyada ishlamoqda. Muammo yoki taklif bo\'lsa murojaat qiling.',
+    'beta.contact': 'Murojaat qilish',
+
+    // 404
+    'notFound.title': 'Sahifa topilmadi',
+    'notFound.desc': 'Kechirasiz, siz qidirayotgan sahifa mavjud emas yoki ko\'chirilgan.',
+    'notFound.home': 'Bosh sahifaga qaytish',
+    'notFound.back': 'Orqaga',
+
+    // Contact / support
+    'nav.contact': 'Aloqa',
+    'contact.title': 'Biz bilan bog\'lanish',
+    'contact.subtitle': 'Savol, taklif yoki muammo bo\'lsa — biz bilan bog\'laning.',
+    'contact.support': 'Qo\'llab-quvvatlash boti',
+    'contact.supportDesc': 'Eng tez javob uchun Telegram support botimizga yozing.',
+    'contact.openBot': 'Telegram botni ochish',
+    'contact.phone': 'Telefon',
+    'contact.telegram': 'Telegram',
+    'contact.email': 'Email',
+    'contact.workHours': 'Ish vaqti: Dushanba–Shanba, 9:00–18:00',
   },
   en: {
     // Common
@@ -610,6 +632,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'stats.monthly': 'Monthly activity',
     'stats.scoreDistribution': 'Score distribution',
     'stats.noData': 'No data',
+
+    // Beta banner
+    'beta.message': 'The site is in beta. If you have an issue or suggestion, please contact us.',
+    'beta.contact': 'Contact us',
+
+    // 404
+    'notFound.title': 'Page not found',
+    'notFound.desc': 'Sorry, the page you are looking for does not exist or has been moved.',
+    'notFound.home': 'Back to home',
+    'notFound.back': 'Go back',
+
+    // Contact / support
+    'nav.contact': 'Contact',
+    'contact.title': 'Contact us',
+    'contact.subtitle': 'Have a question, suggestion or problem? Get in touch.',
+    'contact.support': 'Support bot',
+    'contact.supportDesc': 'For the fastest response, message our Telegram support bot.',
+    'contact.openBot': 'Open Telegram bot',
+    'contact.phone': 'Phone',
+    'contact.telegram': 'Telegram',
+    'contact.email': 'Email',
+    'contact.workHours': 'Working hours: Mon–Sat, 9:00–18:00',
   },
   ru: {
     // Common
@@ -915,6 +959,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'stats.monthly': 'Месячная активность',
     'stats.scoreDistribution': 'Распределение баллов',
     'stats.noData': 'Нет данных',
+
+    // Beta banner
+    'beta.message': 'Сайт работает в бета-версии. Если есть проблема или предложение — свяжитесь с нами.',
+    'beta.contact': 'Связаться',
+
+    // 404
+    'notFound.title': 'Страница не найдена',
+    'notFound.desc': 'Извините, запрашиваемая страница не существует или была перемещена.',
+    'notFound.home': 'На главную',
+    'notFound.back': 'Назад',
+
+    // Contact / support
+    'nav.contact': 'Контакты',
+    'contact.title': 'Связаться с нами',
+    'contact.subtitle': 'Есть вопрос, предложение или проблема? Напишите нам.',
+    'contact.support': 'Бот поддержки',
+    'contact.supportDesc': 'Для быстрого ответа напишите нашему Telegram-боту поддержки.',
+    'contact.openBot': 'Открыть Telegram-бота',
+    'contact.phone': 'Телефон',
+    'contact.telegram': 'Telegram',
+    'contact.email': 'Email',
+    'contact.workHours': 'Время работы: Пн–Сб, 9:00–18:00',
   },
 }
 

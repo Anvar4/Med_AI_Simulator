@@ -21,6 +21,13 @@ import {
 } from '../controllers/adminController'
 import { getCaseStats, getReferralAnalytics, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
 import {
+    deleteTicket,
+    getSupportStats,
+    getSupportTickets,
+    replyToTicket,
+    updateTicketStatus,
+} from '../controllers/supportController'
+import {
     approveTopUpAdmin,
     createCard,
     deleteCard,
@@ -49,6 +56,13 @@ router.get('/revenue', getRevenueAnalytics)
 router.get('/server-health', getServerHealth)
 router.get('/case-stats', getCaseStats)
 router.get('/referrals', getReferralAnalytics)
+
+// Support tickets (from the Telegram support bot)
+router.get('/support/stats', getSupportStats)
+router.get('/support/tickets', getSupportTickets)
+router.patch('/support/tickets/:id', updateTicketStatus)
+router.post('/support/tickets/:id/reply', replyToTicket)
+router.delete('/support/tickets/:id', deleteTicket)
 
 router.get('/users', getUsers)
 router.get('/users/:id', getUserById)

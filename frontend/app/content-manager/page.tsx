@@ -7,6 +7,8 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { AdminCategory, api, BackendCase, CourseDetail, CourseInput, CourseSummary } from '@/lib/api';
 import { canAccessContentManager, useAuth } from '@/lib/auth-context';
+import { useDialog } from '@/lib/dialog-context';
+import { useToast } from '@/lib/toast-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     AlertCircle,
@@ -829,6 +831,8 @@ function CaseModal({ editCase, onClose, onSave, adminCategories }: { editCase?: 
 
 /* ─── Course management (CM panel) ─── */
 function CourseManager() {
+	const toast = useToast()
+	const dialog = useDialog()
 	const [courses, setCourses] = useState<CourseSummary[]>([])
 	const [loading, setLoading] = useState(false)
 	const [selected, setSelected] = useState<CourseDetail | null>(null)
@@ -866,8 +870,9 @@ function CourseManager() {
 	}
 
 	async function handleDeleteCourse(id: string) {
-		if (!confirm('Kursni va unga tegishli barcha pleylist/videolarni o\'chirasizmi?')) return
-		try { await api.courses.deleteCourse(id); if (selected?._id === id) setSelected(null); loadCourses() } catch { /* silent */ }
+		const ok = await dialog.confirm({ title: 'Kursni o\'chirish', message: 'Kursni va unga tegishli barcha pleylist/videolarni o\'chirasizmi?', danger: true, confirmText: 'O\'chirish' })
+		if (!ok) return
+		try { await api.courses.deleteCourse(id); if (selected?._id === id) setSelected(null); toast.success('Kurs o\'chirildi'); loadCourses() } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
 	}
 
 	// Course detail view (playlists + videos)
@@ -942,6 +947,8 @@ function CourseManager() {
 
 /* ─── Single course: playlists + videos ─── */
 function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDetail; onBack: () => void; onRefresh: () => void }) {
+	const toast = useToast()
+	const dialog = useDialog()
 	const [newPlaylist, setNewPlaylist] = useState('')
 	const [videoForms, setVideoForms] = useState<Record<string, { title: string; url: string }>>({})
 
@@ -950,8 +957,9 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
 		try { await api.courses.createPlaylist(course._id, { title: newPlaylist.trim() }); setNewPlaylist(''); onRefresh() } catch { /* silent */ }
 	}
 	async function delPlaylist(id: string) {
-		if (!confirm('Pleylist va undagi videolarni o\'chirasizmi?')) return
-		try { await api.courses.deletePlaylist(id); onRefresh() } catch { /* silent */ }
+		const ok = await dialog.confirm({ title: 'Pleylistni o\'chirish', message: 'Pleylist va undagi videolarni o\'chirasizmi?', danger: true, confirmText: 'O\'chirish' })
+		if (!ok) return
+		try { await api.courses.deletePlaylist(id); toast.success('Pleylist o\'chirildi'); onRefresh() } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
 	}
 	async function addVideo(playlistId: string) {
 		const f = videoForms[playlistId]

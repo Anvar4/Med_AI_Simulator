@@ -1,12 +1,16 @@
 'use client'
 
 import { AdminCard, api } from '@/lib/api'
+import { useDialog } from '@/lib/dialog-context'
+import { useToast } from '@/lib/toast-context'
 import { CreditCard, Pencil, Plus, Power, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 const empty = { cardNumber: '', cardHolderName: '', bankName: '', description: '', sortOrder: 0, isActive: true }
 
 export default function AdminCardsTab() {
+  const toast = useToast()
+  const dialog = useDialog()
   const [cards, setCards] = useState<AdminCard[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<AdminCard | 'new' | null>(null)
@@ -40,8 +44,9 @@ export default function AdminCardsTab() {
     try { await api.paymentAdmin.updateCard(c._id, { isActive: !c.isActive }); load() } catch { /* silent */ }
   }
   async function remove(c: AdminCard) {
-    if (!confirm('Kartani o\'chirasizmi?')) return
-    try { await api.paymentAdmin.deleteCard(c._id); load() } catch { /* silent */ }
+    const ok = await dialog.confirm({ title: 'Kartani o\'chirish', message: 'Bu kartani o\'chirasizmi?', danger: true, confirmText: 'O\'chirish' })
+    if (!ok) return
+    try { await api.paymentAdmin.deleteCard(c._id); toast.success('Karta o\'chirildi'); load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
   }
 
   return (

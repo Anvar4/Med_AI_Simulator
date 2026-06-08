@@ -5,6 +5,7 @@ import Card from '@/components/ui/Card';
 import { api, BackendCase } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
+import { useToast } from '@/lib/toast-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Activity, AlertCircle, ArrowRight, CheckCircle, Clock, CreditCard, Filter, Loader2, Lock, Search, Stethoscope, User, Volume2, VolumeX, XCircle, Zap } from 'lucide-react';
 import { useTTS } from '@/lib/use-tts';
@@ -29,6 +30,7 @@ function formatTime(seconds: number) {
 export default function EmergencyPage() {
 	const { user } = useAuth()
 	const { t, locale } = useT()
+	const toast = useToast()
 	const tts = useTTS(locale as 'uz' | 'ru' | 'en')
 	const router = useRouter()
 	const [cases, setCases] = useState<BackendCase[]>([])
@@ -169,7 +171,7 @@ export default function EmergencyPage() {
 			if (symptomText.length > 1) tts.speak(symptomText, g)
 			setTimeExpired(false)
 		} catch (e) {
-			alert(e instanceof Error ? e.message : 'Xatolik')
+			toast.error(e instanceof Error ? e.message : 'Xatolik')
 		}
 	}
 
@@ -189,7 +191,7 @@ export default function EmergencyPage() {
 			})
 			setResult(res.result)
 		} catch (e) {
-			alert(e instanceof Error ? e.message : 'Xatolik')
+			toast.error(e instanceof Error ? e.message : 'Xatolik')
 		} finally { setSubmitting(false) }
 	}
 

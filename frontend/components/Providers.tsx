@@ -1,9 +1,12 @@
 'use client'
 
 import ChatWidget from '@/components/ChatWidget'
+import BetaBanner from '@/components/layout/BetaBanner'
 import { AuthProvider } from '@/lib/auth-context'
+import { DialogProvider } from '@/lib/dialog-context'
 import { LanguageProvider } from '@/lib/language-context'
 import { ThemeProvider } from '@/lib/theme-context'
+import { ToastProvider } from '@/lib/toast-context'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { ReactNode } from 'react'
 
@@ -15,8 +18,13 @@ export default function Providers({ children }: { children: ReactNode }) {
 			<AuthProvider>
 				<LanguageProvider>
 					<ThemeProvider>
-						{children}
-						<ChatWidget />
+						<ToastProvider>
+							<DialogProvider>
+								<BetaBanner />
+								{children}
+								<ChatWidget />
+							</DialogProvider>
+						</ToastProvider>
 					</ThemeProvider>
 				</LanguageProvider>
 			</AuthProvider>

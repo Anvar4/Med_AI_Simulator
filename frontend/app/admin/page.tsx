@@ -8,6 +8,7 @@ import { AdminCategory, AdminStats, api, BackendCase, BackendUser, CaseStats, Pa
 import AdminCardsTab from '@/components/admin/AdminCardsTab';
 import AdminTopUpsTab from '@/components/admin/AdminTopUpsTab';
 import AdminReferralsTab from '@/components/admin/AdminReferralsTab';
+import AdminSupportTab from '@/components/admin/AdminSupportTab';
 import { canAccessAdmin, useAuth } from '@/lib/auth-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -50,7 +51,7 @@ function formatUptime(seconds: number): string {
 	return `${m}d`
 }
 
-type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review' | 'cards' | 'topups' | 'referrals'
+type Tab = 'dashboard' | 'users' | 'promo' | 'categories' | 'payments' | 'review' | 'cards' | 'topups' | 'referrals' | 'support'
 
 /* ─── Create/Edit User Modal ─── */
 interface UserModalProps {
@@ -511,6 +512,7 @@ export default function AdminPage() {
 		{ id: 'categories' as Tab, label: 'Turkumlar' },
 		{ id: 'promo' as Tab, label: 'Promo kodlar' },
 		{ id: 'referrals' as Tab, label: 'Referallar' },
+		{ id: 'support' as Tab, label: 'Murojaatlar' },
 	]
 
 	const roleLabel = (role: string) => role === 'admin' ? 'Admin' : role === 'instructor' ? 'Menejer' : 'User'
@@ -1325,6 +1327,13 @@ export default function AdminPage() {
 					{tab === 'referrals' && (
 						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
 							<AdminReferralsTab />
+						</motion.div>
+					)}
+
+					{/* ── Support Tab ── */}
+					{tab === 'support' && (
+						<motion.div initial='hidden' animate='visible' variants={fadeIn}>
+							<AdminSupportTab />
 						</motion.div>
 					)}
 

@@ -268,6 +268,23 @@ export const api = {
     getReferrals: () =>
       request<{ status: string; referrals: ReferralAnalytics }>('/admin/referrals'),
 
+    // Support tickets (from the Telegram support bot)
+    getSupportStats: () =>
+      request<{ status: string; stats: SupportStats }>('/admin/support/stats'),
+    getSupportTickets: (params?: { status?: string; page?: number }) => {
+      const qs = new URLSearchParams()
+      if (params?.status) qs.set('status', params.status)
+      if (params?.page) qs.set('page', String(params.page))
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      return request<{ status: string; total: number; totalPages: number; currentPage: number; tickets: SupportTicket[] }>(`/admin/support/tickets${suffix}`)
+    },
+    updateTicketStatus: (id: string, status: 'open' | 'in_progress' | 'resolved') =>
+      request<{ status: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    replyToTicket: (id: string, text: string) =>
+      request<{ status: string; delivered: boolean; message: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}/reply`, { method: 'POST', body: JSON.stringify({ text }) }),
+    deleteTicket: (id: string) =>
+      request<{ status: string; message: string }>(`/admin/support/tickets/${id}`, { method: 'DELETE' }),
+
     // Payment requests (manual confirmation)
     getPayments: (params?: { status?: string; page?: number }) => {
       const qs = new URLSearchParams()
@@ -1016,4 +1033,35 @@ export interface ReferralAnalytics {
     points: number
     lastInviteAt: string
   }[]
+}
+
+// ─── Support tickets ─────────────────────────────────────────
+export interface SupportStats {
+  total: number
+  open: number
+  inProgress: number
+  resolved: number
+  pending: number
+}
+
+export interface TicketReply {
+  fromAdmin: boolean
+  text: string
+  createdAt: string
+}
+
+export interface SupportTicket {
+  _id: string
+  telegramId: string
+  telegramUsername?: string
+  telegramName?: string
+  chatId: string
+  user?: { _id: string; name: string; email: string; username?: string; phone?: string; avatar?: string; isPremium?: boolean; role?: string } | null
+  category?: string
+  message: string
+  status: 'open' | 'in_progress' | 'resolved'
+  replies: TicketReply[]
+  resolvedAt?: string
+  createdAt: string
+  updatedAt: string
 }
