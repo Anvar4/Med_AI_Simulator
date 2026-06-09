@@ -3,6 +3,7 @@
 
 import Button from '@/components/ui/Button'
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher'
+import ThemeSwitcher from '@/components/layout/ThemeSwitcher'
 import { useT } from '@/lib/language-context'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
@@ -25,7 +26,9 @@ export default function Navbar() {
 			<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
 				<div className='flex items-center justify-between h-16'>
 					<Link href='/' className='flex items-center gap-2.5'>
-						<img src='/logotip.png' alt='Med AI Simulator' className='h-10 w-auto object-contain' />
+						{/* Desktop: to'liq logotip; Mobil (responsive): logopngremove */}
+						<img src='/logotip.png' alt='Med AI Simulator' className='hidden md:block h-10 w-auto object-contain' />
+						<img src='/logopngremove.png' alt='Med AI Simulator' className='block md:hidden h-10 w-auto object-contain' />
 					</Link>
 
 					<div className='hidden md:flex items-center gap-8'>
@@ -41,6 +44,7 @@ export default function Navbar() {
 					</div>
 
 					<div className='hidden md:flex items-center gap-3'>
+						<ThemeSwitcher />
 						<LanguageSwitcher />
 						<Link href='/login'>
 							<Button variant='ghost' size='sm'>
@@ -82,7 +86,8 @@ export default function Navbar() {
 								</a>
 							))}
 							<div className='pt-3 border-t border-border space-y-2'>
-								<div className='flex justify-center pb-1'>
+								<div className='flex justify-center items-center gap-3 pb-1'>
+									<ThemeSwitcher />
 									<LanguageSwitcher />
 								</div>
 								<Link href='/login' className='block'>

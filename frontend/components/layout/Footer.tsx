@@ -1,4 +1,4 @@
-import { Activity } from 'lucide-react'
+/* eslint-disable @next/next/no-img-element */
 import Link from 'next/link'
 
 export default function Footer() {
@@ -8,9 +8,7 @@ export default function Footer() {
 				<div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
 					<div className='col-span-1 md:col-span-2'>
 						<Link href='/' className='flex items-center gap-2.5 mb-4'>
-							<div className='w-9 h-9 bg-primary rounded-xl flex items-center justify-center'>
-								<Activity className='w-5 h-5 text-secondary' />
-							</div>
+							<img src='/logotip.png' alt='Med AI Simulator' className='h-9 w-auto object-contain' />
 							<span className='text-lg font-bold text-text-primary'>
 								Med AI Simulator
 							</span>

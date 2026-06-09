@@ -60,6 +60,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.pricing': 'Narxlar',
     'nav.howItWorks': 'Qanday ishlaydi',
     'nav.testimonials': 'Fikrlar',
+    'theme.light': "Yorug'",
+    'theme.dark': "Qorong'i",
+    'theme.system': 'Tizim',
 
     // Dashboard
     'dashboard.welcome': 'Xush kelibsiz! 👋',
@@ -387,6 +390,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.pricing': 'Pricing',
     'nav.howItWorks': 'How it works',
     'nav.testimonials': 'Testimonials',
+    'theme.light': 'Light',
+    'theme.dark': 'Dark',
+    'theme.system': 'System',
 
     // Dashboard
     'dashboard.welcome': 'Welcome! 👋',
@@ -714,6 +720,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'nav.pricing': 'Цена',
     'nav.howItWorks': 'Как это работает',
     'nav.testimonials': 'Отзывы',
+    'theme.light': 'Светлая',
+    'theme.dark': 'Тёмная',
+    'theme.system': 'Системная',
 
     // Dashboard
     'dashboard.welcome': 'Добро пожаловать! 👋',
