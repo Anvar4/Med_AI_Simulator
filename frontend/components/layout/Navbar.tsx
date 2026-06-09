@@ -1,10 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import Button from '@/components/ui/Button'
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher'
 import { useT } from '@/lib/language-context'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Activity, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -20,16 +21,11 @@ export default function Navbar() {
 	]
 
 	return (
-		<nav className='fixed top-0 left-0 right-0 z-50 glass'>
+		<nav className='sticky top-0 left-0 right-0 z-50 glass'>
 			<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
 				<div className='flex items-center justify-between h-16'>
 					<Link href='/' className='flex items-center gap-2.5'>
-						<div className='w-9 h-9 bg-primary rounded-xl flex items-center justify-center'>
-							<Activity className='w-5 h-5 text-secondary' />
-						</div>
-						<span className='text-lg font-bold text-text-primary font-[family-name:var(--font-sora)]'>
-							Med AI
-						</span>
+						<img src='/logotip.png' alt='Med AI Simulator' className='h-10 w-auto object-contain' />
 					</Link>
 
 					<div className='hidden md:flex items-center gap-8'>
@@ -46,12 +42,12 @@ export default function Navbar() {
 
 					<div className='hidden md:flex items-center gap-3'>
 						<LanguageSwitcher />
-						<Link href='/dashboard'>
+						<Link href='/login'>
 							<Button variant='ghost' size='sm'>
 								{t('auth.login')}
 							</Button>
 						</Link>
-						<Link href='/dashboard'>
+						<Link href='/register'>
 							<Button size='sm'>{t('nav.getStarted')}</Button>
 						</Link>
 					</div>
@@ -89,12 +85,12 @@ export default function Navbar() {
 								<div className='flex justify-center pb-1'>
 									<LanguageSwitcher />
 								</div>
-								<Link href='/dashboard' className='block'>
+								<Link href='/login' className='block'>
 									<Button variant='secondary' size='sm' className='w-full'>
 										{t('auth.login')}
 									</Button>
 								</Link>
-								<Link href='/dashboard' className='block'>
+								<Link href='/register' className='block'>
 									<Button size='sm' className='w-full'>
 										{t('nav.getStarted')}
 									</Button>
