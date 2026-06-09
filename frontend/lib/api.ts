@@ -437,12 +437,13 @@ export const api = {
 
   // ─── Courses (DB-driven video courses) ──────────────────────
   courses: {
-    list: (params: { category?: string; search?: string; level?: string; page?: number } = {}) => {
+    list: (params: { category?: string; search?: string; level?: string; page?: number; mine?: boolean } = {}) => {
       const qs = new URLSearchParams()
       if (params.category) qs.set('category', params.category)
       if (params.search) qs.set('search', params.search)
       if (params.level) qs.set('level', params.level)
       if (params.page) qs.set('page', String(params.page))
+      if (params.mine) qs.set('mine', 'true')
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
       return request<{ status: string; total: number; totalPages: number; currentPage: number; courses: CourseSummary[] }>(
         `/courses${suffix}`
@@ -492,16 +493,26 @@ export const api = {
     deletePlaylist: (id: string) =>
       request<{ status: string; message: string }>(`/courses/playlists/${id}`, { method: 'DELETE' }),
 
-    createVideo: (playlistId: string, data: { title: string; url: string; description?: string; durationSeconds?: number; order?: number }) =>
+    createVideo: (playlistId: string, data: { title: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/playlists/${playlistId}/videos`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateVideo: (id: string, data: { title?: string; url?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
+    updateVideo: (id: string, data: { title?: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/videos/${id}`, {
         method: 'PATCH', body: JSON.stringify(data),
       }),
     deleteVideo: (id: string) =>
       request<{ status: string; message: string }>(`/courses/videos/${id}`, { method: 'DELETE' }),
+
+    // Drag & drop reorder (CM / admin)
+    reorderVideos: (playlistId: string, videoIds: string[]) =>
+      request<{ status: string; count: number }>(`/courses/playlists/${playlistId}/reorder`, {
+        method: 'PATCH', body: JSON.stringify({ videoIds }),
+      }),
+    reorderPlaylists: (courseId: string, playlistIds: string[]) =>
+      request<{ status: string; count: number }>(`/courses/${courseId}/playlists/reorder`, {
+        method: 'PATCH', body: JSON.stringify({ playlistIds }),
+      }),
   },
 
   // ─── Speech-to-Text (voice input) ──────────────────────────
@@ -746,6 +757,9 @@ export interface CourseInput {
   description?: string
   category?: string
   author?: string
+  instructor?: string
+  language?: 'uz' | 'ru' | 'en'
+  durationLabel?: string
   level?: 'beginner' | 'intermediate' | 'advanced'
   isPremium?: boolean
   coverImage?: string
@@ -758,6 +772,9 @@ export interface CourseSummary {
   description: string
   category: string
   author: string
+  instructor?: string
+  language?: 'uz' | 'ru' | 'en'
+  durationLabel?: string
   coverImage?: string
   level: 'beginner' | 'intermediate' | 'advanced'
   isPremium: boolean
@@ -768,7 +785,9 @@ export interface CourseVideo {
   _id: string
   title: string
   description: string
-  youtubeId: string
+  source?: 'youtube' | 'upload'
+  youtubeId?: string
+  videoUrl?: string
   durationSeconds: number
   order: number
   completed?: boolean

@@ -1,16 +1,21 @@
 import mongoose, { Document, Schema } from 'mongoose'
 
 /**
- * A single lesson video belonging to a Playlist. Source is currently YouTube;
- * `youtubeId` is stored normalized so the frontend can build embed/watch URLs
- * without re-parsing. `order` controls position within the playlist.
+ * A single lesson video belonging to a Playlist. The source is either a
+ * YouTube video (`source: 'youtube'`, `youtubeId` normalized) or an uploaded
+ * file stored on DigitalOcean Spaces (`source: 'upload'`, `videoUrl` public).
+ * `order` controls position within the playlist.
  */
+export type VideoSource = 'youtube' | 'upload'
+
 export interface IVideo extends Document {
   playlist: mongoose.Types.ObjectId
   course: mongoose.Types.ObjectId
   title: string
   description: string
-  youtubeId: string
+  source: VideoSource
+  youtubeId?: string
+  videoUrl?: string
   durationSeconds: number
   order: number
   isPublished: boolean
@@ -25,7 +30,10 @@ const videoSchema = new Schema<IVideo>(
     course: { type: Schema.Types.ObjectId, ref: 'Course', required: true, index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
-    youtubeId: { type: String, required: true, trim: true },
+    source: { type: String, enum: ['youtube', 'upload'], default: 'youtube' },
+    // youtubeId for source='youtube', videoUrl for source='upload' (see pre-validate)
+    youtubeId: { type: String, trim: true },
+    videoUrl: { type: String, trim: true },
     durationSeconds: { type: Number, default: 0 },
     order: { type: Number, default: 0, index: true },
     isPublished: { type: Boolean, default: true },
@@ -33,6 +41,16 @@ const videoSchema = new Schema<IVideo>(
   },
   { timestamps: true }
 )
+
+// Require the field matching the chosen source.
+videoSchema.pre('validate', function (next) {
+  if (this.source === 'upload') {
+    if (!this.videoUrl) return next(new Error('Yuklangan video uchun videoUrl majburiy'))
+  } else if (!this.youtubeId) {
+    return next(new Error('YouTube video uchun youtubeId majburiy'))
+  }
+  next()
+})
 
 videoSchema.index({ playlist: 1, order: 1 })
 

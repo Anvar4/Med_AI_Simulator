@@ -6,6 +6,15 @@ import { useAuth } from '@/lib/auth-context'
 import { Award, ChevronLeft, Lock, PlayCircle, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/** Build a playable src for uploaded videos: absolute URLs pass through; a
+ *  relative /uploads path is prefixed with the backend origin. */
+function resolveVideoSrc(url?: string): string {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000'
+  return `${base}${url}`
+}
+
 function CourseCatalog({ onOpen }: { onOpen: (slug: string) => void }) {
   const [courses, setCourses] = useState<CourseSummary[]>([])
   const [categories, setCategories] = useState<{ name: string; count: number }[]>([])
@@ -191,16 +200,27 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
             {activeVideo ? (
               <div className='bg-surface border border-border rounded-2xl overflow-hidden'>
                 <div className='aspect-video bg-black'>
-                  <iframe
-                    key={activeVideo._id}
-                    src={`https://www.youtube.com/embed/${activeVideo.youtubeId}`}
-                    title={activeVideo.title}
-                    className='w-full h-full border-0'
-                    loading='lazy'
-                    allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-                    referrerPolicy='strict-origin-when-cross-origin'
-                    allowFullScreen
-                  />
+                  {activeVideo.source === 'upload' ? (
+                    <video
+                      key={activeVideo._id}
+                      src={resolveVideoSrc(activeVideo.videoUrl)}
+                      controls
+                      className='w-full h-full'
+                      // Auto-mark complete when the upload video finishes.
+                      onEnded={() => { if (user && !activeVideo.completed) markComplete(activeVideo._id) }}
+                    />
+                  ) : (
+                    <iframe
+                      key={activeVideo._id}
+                      src={`https://www.youtube.com/embed/${activeVideo.youtubeId}`}
+                      title={activeVideo.title}
+                      className='w-full h-full border-0'
+                      loading='lazy'
+                      allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+                      referrerPolicy='strict-origin-when-cross-origin'
+                      allowFullScreen
+                    />
+                  )}
                 </div>
                 <div className='p-4'>
                   <h2 className='text-lg font-bold text-text-primary'>{activeVideo.title}</h2>

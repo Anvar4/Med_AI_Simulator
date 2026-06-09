@@ -34,9 +34,16 @@ async function uniqueSlug(title: string): Promise<string> {
 // GET /api/courses?category=&search=&level=&page=&limit=
 export const listCourses = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { category, search, level, page = '1', limit = '12' } = req.query
+    const { category, search, level, page = '1', limit = '12', mine } = req.query
 
-    const filter: Record<string, unknown> = { isPublished: true }
+    const filter: Record<string, unknown> = {}
+    // CM panel (mine=true, staff only) sees its own courses regardless of publish
+    // state; admins see all. Everyone else (public catalog) sees published only.
+    if (mine === 'true' && isStaff(req)) {
+      if (req.user!.role !== 'admin') filter.createdBy = req.user!._id
+    } else {
+      filter.isPublished = true
+    }
     if (category && category !== 'Barchasi') filter.category = category as string
     if (level && ['beginner', 'intermediate', 'advanced'].includes(level as string)) {
       filter.level = level as string
@@ -109,13 +116,16 @@ export const getCourse = async (req: AuthRequest, res: Response): Promise<void> 
     // Premium gating: non-premium, non-staff users get a locked course (no videos).
     const locked = course.isPremium && !req.user?.isPremium && !isStaff(req)
 
-    const playlists = await Playlist.find({ course: course._id, isPublished: true })
+    // Staff manage drafts too; public viewers see published content only.
+    const pubFilter = isStaff(req) ? {} : { isPublished: true }
+
+    const playlists = await Playlist.find({ course: course._id, ...pubFilter })
       .sort({ order: 1, createdAt: 1 })
       .lean()
 
     const videos = locked
       ? []
-      : await Video.find({ course: course._id, isPublished: true })
+      : await Video.find({ course: course._id, ...pubFilter })
           .sort({ order: 1, createdAt: 1 })
           .lean()
 
@@ -157,7 +167,7 @@ export const getCourse = async (req: AuthRequest, res: Response): Promise<void> 
 // ─── CM/Admin: Course CRUD ─────────────────────────────────────
 export const createCourse = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { title, description, category, level, isPremium, coverImage } = req.body
+    const { title, description, category, level, isPremium, coverImage, instructor, language, durationLabel } = req.body
     if (!title || typeof title !== 'string') {
       res.status(400).json({ message: 'Kurs sarlavhasi majburiy' })
       return
@@ -171,6 +181,9 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<voi
       description: typeof description === 'string' ? description : '',
       category: typeof category === 'string' && category.trim() ? category.trim() : 'Umumiy',
       author,
+      instructor: typeof instructor === 'string' && instructor.trim() ? instructor.trim() : undefined,
+      language: ['uz', 'ru', 'en'].includes(language) ? language : 'uz',
+      durationLabel: typeof durationLabel === 'string' ? durationLabel.trim() : undefined,
       level: ['beginner', 'intermediate', 'advanced'].includes(level) ? level : 'beginner',
       isPremium: !!isPremium,
       coverImage: typeof coverImage === 'string' ? coverImage : undefined,
@@ -202,7 +215,7 @@ export const updateCourse = async (req: AuthRequest, res: Response): Promise<voi
     const course = await loadOwnedCourse(req, res)
     if (!course) return
 
-    applyFields(course, req.body, ['title', 'description', 'category', 'author', 'level', 'isPremium', 'coverImage'])
+    applyFields(course, req.body, ['title', 'description', 'category', 'author', 'instructor', 'language', 'durationLabel', 'level', 'isPremium', 'coverImage'])
     // Only admins may toggle publish state.
     if (req.user!.role === 'admin' && typeof req.body.isPublished === 'boolean') {
       course.isPublished = req.body.isPublished
@@ -310,22 +323,44 @@ export const createVideo = async (req: AuthRequest, res: Response): Promise<void
       res.status(403).json({ message: 'Ruxsat berilmagan' })
       return
     }
-    const { title, description, url, durationSeconds, order } = req.body
-    const youtubeId = parseYoutubeId(typeof url === 'string' ? url : '')
-    if (!title || !youtubeId) {
-      res.status(400).json({ message: 'Sarlavha va yaroqli YouTube havola majburiy' })
+    const { title, description, url, videoUrl, durationSeconds, order } = req.body
+    if (!title) {
+      res.status(400).json({ message: 'Video sarlavhasi majburiy' })
       return
     }
-    const video = await Video.create({
+    // Source = 'upload' when a videoUrl is provided; otherwise YouTube link.
+    const source: 'youtube' | 'upload' = (req.body.source === 'upload' || (typeof videoUrl === 'string' && videoUrl.trim()))
+      ? 'upload'
+      : 'youtube'
+
+    const payload: Record<string, unknown> = {
       playlist: playlist._id,
       course: playlist.course,
       title: String(title).trim(),
       description: typeof description === 'string' ? description : '',
-      youtubeId,
+      source,
       durationSeconds: typeof durationSeconds === 'number' ? durationSeconds : 0,
       order: typeof order === 'number' ? order : 0,
       createdBy: req.user!._id,
-    })
+    }
+
+    if (source === 'upload') {
+      const u = typeof videoUrl === 'string' ? videoUrl.trim() : ''
+      if (!/^https?:\/\//.test(u)) {
+        res.status(400).json({ message: 'Yuklangan video uchun yaroqli URL majburiy' })
+        return
+      }
+      payload.videoUrl = u
+    } else {
+      const youtubeId = parseYoutubeId(typeof url === 'string' ? url : '')
+      if (!youtubeId) {
+        res.status(400).json({ message: 'Yaroqli YouTube havola majburiy' })
+        return
+      }
+      payload.youtubeId = youtubeId
+    }
+
+    const video = await Video.create(payload)
     res.status(201).json({ status: 'success', video })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
@@ -343,13 +378,25 @@ export const updateVideo = async (req: AuthRequest, res: Response): Promise<void
       res.status(403).json({ message: 'Ruxsat berilmagan' })
       return
     }
-    if (req.body.url !== undefined) {
+    // Switch to uploaded source if a videoUrl is supplied.
+    if (typeof req.body.videoUrl === 'string' && req.body.videoUrl.trim()) {
+      const u = req.body.videoUrl.trim()
+      if (!/^https?:\/\//.test(u)) {
+        res.status(400).json({ message: 'Yaroqsiz video URL' })
+        return
+      }
+      video.source = 'upload'
+      video.videoUrl = u
+      video.youtubeId = undefined
+    } else if (req.body.url !== undefined) {
       const yt = parseYoutubeId(String(req.body.url))
       if (!yt) {
         res.status(400).json({ message: 'Yaroqsiz YouTube havola' })
         return
       }
+      video.source = 'youtube'
       video.youtubeId = yt
+      video.videoUrl = undefined
     }
     applyFields(video, req.body, ['title', 'description', 'durationSeconds', 'order', 'isPublished'])
     await video.save()
@@ -373,6 +420,71 @@ export const deleteVideo = async (req: AuthRequest, res: Response): Promise<void
     await VideoProgress.deleteMany({ video: video._id })
     await video.deleteOne()
     res.json({ status: 'success', message: 'Video o\'chirildi' })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// ─── CM/Admin: reorder (drag & drop) ───────────────────────────
+// PATCH /api/courses/playlists/:playlistId/reorder  body: { videoIds: string[] }
+export const reorderVideos = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Route param is :playlistId (loadOwnedPlaylist reads :id, so load directly).
+    const playlist = await Playlist.findById(req.params.playlistId)
+    if (!playlist) {
+      res.status(404).json({ message: 'Pleylist topilmadi' })
+      return
+    }
+    if (req.user!.role !== 'admin' && playlist.createdBy?.toString() !== req.user!._id.toString()) {
+      res.status(403).json({ message: 'Ruxsat berilmagan' })
+      return
+    }
+    const { videoIds } = req.body
+    if (!Array.isArray(videoIds)) {
+      res.status(400).json({ message: 'videoIds massiv bo\'lishi kerak' })
+      return
+    }
+    // Only reorder videos that actually belong to this playlist.
+    const owned = await Video.find({ playlist: playlist._id }).select('_id').lean()
+    const ownedSet = new Set(owned.map(v => String(v._id)))
+    const ops = videoIds
+      .filter((id: unknown): id is string => typeof id === 'string' && ownedSet.has(id))
+      .map((id: string, index: number) => ({
+        updateOne: { filter: { _id: id }, update: { $set: { order: index } } },
+      }))
+    if (ops.length) await Video.bulkWrite(ops)
+    res.json({ status: 'success', count: ops.length })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// PATCH /api/courses/:courseId/playlists/reorder  body: { playlistIds: string[] }
+export const reorderPlaylists = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const course = await Course.findById(req.params.courseId)
+    if (!course) {
+      res.status(404).json({ message: 'Kurs topilmadi' })
+      return
+    }
+    if (req.user!.role !== 'admin' && course.createdBy?.toString() !== req.user!._id.toString()) {
+      res.status(403).json({ message: 'Ruxsat berilmagan' })
+      return
+    }
+    const { playlistIds } = req.body
+    if (!Array.isArray(playlistIds)) {
+      res.status(400).json({ message: 'playlistIds massiv bo\'lishi kerak' })
+      return
+    }
+    const owned = await Playlist.find({ course: course._id }).select('_id').lean()
+    const ownedSet = new Set(owned.map(p => String(p._id)))
+    const ops = playlistIds
+      .filter((id: unknown): id is string => typeof id === 'string' && ownedSet.has(id))
+      .map((id: string, index: number) => ({
+        updateOne: { filter: { _id: id }, update: { $set: { order: index } } },
+      }))
+    if (ops.length) await Playlist.bulkWrite(ops)
+    res.json({ status: 'success', count: ops.length })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }

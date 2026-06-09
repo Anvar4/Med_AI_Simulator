@@ -9,6 +9,8 @@ import {
   getCourse,
   getCourseCategories,
   listCourses,
+  reorderPlaylists,
+  reorderVideos,
   updateCourse,
   updatePlaylist,
   updateVideo,
@@ -43,11 +45,13 @@ router.delete('/:id', protect, staff, deleteCourse)
 
 // ─── CM/Admin: Playlist CRUD ───────────────────────────────────
 router.post('/:courseId/playlists', protect, staff, createPlaylist)
+router.patch('/:courseId/playlists/reorder', protect, staff, reorderPlaylists)
 router.patch('/playlists/:id', protect, staff, updatePlaylist)
 router.delete('/playlists/:id', protect, staff, deletePlaylist)
 
 // ─── CM/Admin: Video CRUD ──────────────────────────────────────
 router.post('/playlists/:playlistId/videos', protect, staff, createVideo)
+router.patch('/playlists/:playlistId/reorder', protect, staff, reorderVideos)
 router.patch('/videos/:id', protect, staff, updateVideo)
 router.delete('/videos/:id', protect, staff, deleteVideo)
 
