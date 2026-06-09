@@ -3,9 +3,14 @@ import { Request, Response } from 'express'
 import mongoose from 'mongoose'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
+import { Category } from '../models/Category'
+import { Certificate } from '../models/Certificate'
+import { Course } from '../models/Course'
 import { PaymentRequest } from '../models/PaymentRequest'
+import { Playlist } from '../models/Playlist'
 import { ReferralEarning } from '../models/ReferralEarning'
 import { User } from '../models/User'
+import { Video } from '../models/Video'
 
 /**
  * Clinical-case breakdown for the admin dashboard: totals, split by type
@@ -53,6 +58,106 @@ export const getCaseStats = async (_req: Request, res: Response): Promise<void> 
         byCategory: byCategory.map(c => ({ category: c._id, count: c.count, avgDifficulty: Math.round((c.avgDifficulty || 0) * 10) / 10 })),
         byDifficulty: difficulty,
         byStatus: byStatus.map(s => ({ status: s._id, count: s.count })),
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+/**
+ * Content Manager dashboard — platform-wide content counts and breakdowns,
+ * all read live from MongoDB. Readable by admin + instructor (content managers).
+ * Modules that don't have models yet (library books, exams, questions) return 0
+ * so the frontend can mark them "coming soon" without inventing mock numbers.
+ * GET /api/admin/cm-dashboard
+ */
+export const getCMDashboard = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const [
+      totalCases,
+      casesByStatus,
+      casesByType,
+      casesByCategory,
+      casesByDifficulty,
+      totalCourses,
+      totalPlaylists,
+      totalVideos,
+      totalCertificates,
+      totalCategories,
+      totalUsers,
+      premiumUsers,
+      attemptsAgg,
+    ] = await Promise.all([
+      Case.countDocuments({}),
+      Case.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Case.aggregate([{ $group: { _id: '$type', count: { $sum: 1 } } }]),
+      Case.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 12 },
+      ]),
+      Case.aggregate([{ $group: { _id: '$difficulty', count: { $sum: 1 } } }]),
+      Course.countDocuments({}),
+      Playlist.countDocuments({}),
+      Video.countDocuments({}),
+      Certificate.countDocuments({}),
+      Category.countDocuments({}),
+      User.countDocuments({}),
+      User.countDocuments({ isPremium: true }),
+      CaseAttempt.aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            avgScore: { $avg: '$score' },
+          },
+        },
+      ]),
+    ])
+
+    const statusMap = Object.fromEntries(casesByStatus.map(s => [s._id, s.count]))
+    const typeMap = Object.fromEntries(casesByType.map(t => [t._id, t.count]))
+    const attempts = attemptsAgg[0] ?? { total: 0, completed: 0, avgScore: 0 }
+    const completionRate = attempts.total > 0
+      ? Math.round((attempts.completed / attempts.total) * 100)
+      : 0
+
+    res.json({
+      status: 'success',
+      dashboard: {
+        // Content counts
+        totalCases,
+        totalEmergencyCases: typeMap['shoshilinch'] || 0,
+        totalCourses,
+        totalPlaylists,
+        totalVideos,
+        totalCertificates,
+        totalCategories,
+        // Publishing state
+        publishedCases: statusMap['published'] || 0,
+        draftCases: statusMap['draft'] || 0,
+        reviewCases: statusMap['review'] || 0,
+        // Users & usage
+        totalUsers,
+        premiumUsers,
+        totalAttempts: attempts.total,
+        completedAttempts: attempts.completed,
+        completionRate,
+        avgScore: Math.round((attempts.avgScore || 0) * 10) / 10,
+        // Modules without models yet (filled in later stages)
+        totalBooks: 0,
+        totalExams: 0,
+        totalQuestions: 0,
+        // Breakdowns for charts
+        casesByCategory: casesByCategory.map(c => ({ category: c._id || '—', count: c.count })),
+        casesByDifficulty: [1, 2, 3, 4, 5].map(level => ({
+          level,
+          count: casesByDifficulty.find(d => d._id === level)?.count || 0,
+        })),
+        casesByType: casesByType.map(t => ({ type: t._id, count: t.count })),
+        casesByStatus: casesByStatus.map(s => ({ status: s._id, count: s.count })),
       },
     })
   } catch (error) {

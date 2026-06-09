@@ -2,20 +2,26 @@
 'use client'
 
 import Sidebar from '@/components/layout/Sidebar';
+import CMDashboard from '@/components/content-manager/CMDashboard';
+import CMPlaceholder from '@/components/content-manager/CMPlaceholder';
+import CMTabBar, { CMTab } from '@/components/content-manager/CMTabBar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { AdminCategory, api, BackendCase, CourseDetail, CourseInput, CourseSummary } from '@/lib/api';
 import { canAccessContentManager, useAuth } from '@/lib/auth-context';
 import { useDialog } from '@/lib/dialog-context';
+import { useT } from '@/lib/language-context';
 import { useToast } from '@/lib/toast-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     AlertCircle,
+    BookOpen,
     CheckCircle,
     Clock,
     Edit3,
     FilePlus,
+    FileQuestion,
     FileText,
     ImagePlus,
     Loader2,
@@ -1037,8 +1043,9 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
 
 export default function ContentManagerPage() {
 	const { user, isLoading } = useAuth()
+	const { t } = useT()
 	const router = useRouter()
-	const [cmTab, setCmTab] = useState<'cases' | 'courses'>('cases')
+	const [cmTab, setCmTab] = useState<CMTab>('dashboard')
 	const [cases, setCases] = useState<BackendCase[]>([])
 	const [total, setTotal] = useState(0)
 	const [casesLoading, setCasesLoading] = useState(false)
@@ -1156,27 +1163,20 @@ export default function ContentManagerPage() {
 					<motion.div initial='hidden' animate='visible' variants={fadeIn} className='mb-8'>
 						<div className='flex items-center gap-3 mb-2'>
 							<UserCog className='w-6 h-6 text-warning' />
-							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>Kontent Boshqaruvi</h1>
-							<Badge variant='warning'>Menejer</Badge>
+							<h1 className='text-2xl sm:text-3xl font-bold text-text-primary'>{t('cm.title')}</h1>
+							<Badge variant='warning'>{t('cm.manager')}</Badge>
 						</div>
-						<p className='text-text-secondary'>Klinik holatlar va video kurslar yaratish, tahrirlash va boshqarish</p>
+						<p className='text-text-secondary'>{t('cm.subtitle')}</p>
 					</motion.div>
 
-					{/* Tab switcher */}
-					<div className='flex gap-2 mb-6'>
-						<button
-							onClick={() => setCmTab('cases')}
-							className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cmTab === 'cases' ? 'bg-primary text-secondary' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
-						>
-							Klinik holatlar
-						</button>
-						<button
-							onClick={() => setCmTab('courses')}
-							className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cmTab === 'courses' ? 'bg-primary text-secondary' : 'bg-surface border border-border text-text-secondary hover:text-text-primary'}`}
-						>
-							Video kurslar
-						</button>
-					</div>
+					{/* 7-tab navigation */}
+						<CMTabBar active={cmTab} onChange={setCmTab} />
+
+						{cmTab === 'dashboard' && <CMDashboard />}
+						{cmTab === 'emergency' && <CMPlaceholder icon={AlertCircle} titleKey='cm.emergency' />}
+						{cmTab === 'library' && <CMPlaceholder icon={BookOpen} titleKey='cm.library' />}
+						{cmTab === 'exams' && <CMPlaceholder icon={FileQuestion} titleKey='cm.exams' />}
+						{cmTab === 'analytics' && <CMDashboard />}
 
 					{cmTab === 'courses' && <CourseManager />}
 

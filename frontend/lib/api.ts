@@ -177,6 +177,10 @@ export const api = {
     getSystemStats: () =>
       request<{ status: string; stats: AdminStats }>('/admin/stats'),
 
+    // Content Manager dashboard (admin + instructor)
+    getCMDashboard: () =>
+      request<{ status: string; dashboard: CMDashboardStats }>('/admin/cm-dashboard'),
+
     getRecentActivity: () =>
       request<{ status: string; recentUsers: BackendUser[]; recentAttempts: unknown[] }>('/admin/activity'),
 
@@ -667,6 +671,37 @@ export interface CaseStats {
   byCategory: { category: string; count: number; avgDifficulty: number }[]
   byDifficulty: { level: number; count: number }[]
   byStatus: { status: string; count: number }[]
+}
+
+export interface CMDashboardStats {
+  // Content counts
+  totalCases: number
+  totalEmergencyCases: number
+  totalCourses: number
+  totalPlaylists: number
+  totalVideos: number
+  totalCertificates: number
+  totalCategories: number
+  // Publishing state
+  publishedCases: number
+  draftCases: number
+  reviewCases: number
+  // Users & usage
+  totalUsers: number
+  premiumUsers: number
+  totalAttempts: number
+  completedAttempts: number
+  completionRate: number
+  avgScore: number
+  // Modules without models yet (0 for now, filled in later stages)
+  totalBooks: number
+  totalExams: number
+  totalQuestions: number
+  // Breakdowns for charts
+  casesByCategory: { category: string; count: number }[]
+  casesByDifficulty: { level: number; count: number }[]
+  casesByType: { type: string; count: number }[]
+  casesByStatus: { status: string; count: number }[]
 }
 
 export interface ServerHealth {
