@@ -134,6 +134,8 @@ const translations: Record<Locale, Record<string, string>> = {
     'cm.dragHint': 'Tartibni sudrab o\'zgartiring',
     'cm.uploaded': 'Yuklangan',
     'cm.youtube': 'YouTube',
+    'cm.videoDescription': 'Video izohi (ixtiyoriy)',
+    'cm.edit': 'Tahrirlash',
 
     // Dashboard
     'dashboard.welcome': 'Xush kelibsiz! 👋',
@@ -530,6 +532,8 @@ const translations: Record<Locale, Record<string, string>> = {
     'cm.dragHint': 'Drag to reorder',
     'cm.uploaded': 'Uploaded',
     'cm.youtube': 'YouTube',
+    'cm.videoDescription': 'Video description (optional)',
+    'cm.edit': 'Edit',
 
     // Dashboard
     'dashboard.welcome': 'Welcome! 👋',
@@ -926,6 +930,8 @@ const translations: Record<Locale, Record<string, string>> = {
     'cm.dragHint': 'Перетащите для изменения порядка',
     'cm.uploaded': 'Загружено',
     'cm.youtube': 'YouTube',
+    'cm.videoDescription': 'Описание видео (необязательно)',
+    'cm.edit': 'Редактировать',
 
     // Dashboard
     'dashboard.welcome': 'Добро пожаловать! 👋',

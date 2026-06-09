@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
-import { Film, GripVertical, Loader2, Play, Plus, Trash2, Upload } from 'lucide-react'
+import { Check, Film, GripVertical, Loader2, Pencil, Play, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 const fadeIn = {
@@ -32,16 +32,30 @@ const fadeIn = {
 
 const inputCls = 'w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/50'
 
-/* ─── Upload a file to /api/upload, returns the public URL ─── */
-async function uploadFile(file: File): Promise<string> {
+/* ─── Upload a file to /api/upload with progress, returns the public URL ───
+ * Uses XHR (not fetch) so we can report upload percentage to the UI. */
+function uploadFile(file: File, onProgress?: (percent: number) => void): Promise<string> {
   const token = (() => { try { return JSON.parse(localStorage.getItem('med-ai-auth') || '{}').token } catch { return '' } })()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000'
-  const fd = new FormData()
-  fd.append('file', file)
-  const r = await fetch(`${apiUrl}/api/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
-  const data = await r.json()
-  if (!data.file?.url) throw new Error(data.message || 'Fayl yuklashda xatolik')
-  return data.file.url
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const fd = new FormData()
+    fd.append('file', file)
+    xhr.open('POST', `${apiUrl}/api/upload`)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText)
+        if (xhr.status >= 200 && xhr.status < 300 && data.file?.url) resolve(data.file.url)
+        else reject(new Error(data.message || 'Fayl yuklashda xatolik'))
+      } catch { reject(new Error('Fayl yuklashda xatolik')) }
+    }
+    xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+    xhr.send(fd)
+  })
 }
 
 /* ─── Top level: course list + create form ─── */
@@ -175,37 +189,59 @@ export default function CMCourses() {
 }
 
 /* ─── Sortable video row ─── */
-function SortableVideo({ video, onDelete }: { video: CourseVideo; onDelete: () => void }) {
+function SortableVideo({ video, onDelete, onEdit }: { video: CourseVideo; onDelete: () => void; onEdit: () => void }) {
   const { t } = useT()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: video._id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
   return (
-    <li ref={setNodeRef} style={style} className='flex items-center gap-2 text-sm text-text-secondary bg-surface-light rounded-lg px-2 py-1.5'>
-      <button {...attributes} {...listeners} className='cursor-grab touch-none text-text-secondary/50 hover:text-text-secondary' title={t('cm.dragHint')}>
-        <GripVertical className='w-4 h-4' />
-      </button>
-      {video.source === 'upload' ? <Play className='w-3.5 h-3.5 text-primary shrink-0' /> : <Film className='w-3.5 h-3.5 text-accent shrink-0' />}
-      <span className='flex-1 line-clamp-1'>{video.title}</span>
-      <span className='text-[10px] text-text-secondary/60'>{video.source === 'upload' ? t('cm.uploaded') : t('cm.youtube')}</span>
-      <button onClick={onDelete} className='p-1 rounded text-text-secondary hover:text-accent'><Trash2 className='w-3.5 h-3.5' /></button>
+    <li ref={setNodeRef} style={style} className='bg-surface-light rounded-lg px-2 py-1.5'>
+      <div className='flex items-center gap-2 text-sm text-text-secondary'>
+        <button {...attributes} {...listeners} className='cursor-grab touch-none text-text-secondary/50 hover:text-text-secondary shrink-0' title={t('cm.dragHint')}>
+          <GripVertical className='w-4 h-4' />
+        </button>
+        {video.source === 'upload' ? <Play className='w-3.5 h-3.5 text-primary shrink-0' /> : <Film className='w-3.5 h-3.5 text-accent shrink-0' />}
+        <span className='flex-1 line-clamp-1 text-text-primary'>{video.title}</span>
+        <span className='text-[10px] text-text-secondary/60 shrink-0'>{video.source === 'upload' ? t('cm.uploaded') : t('cm.youtube')}</span>
+        <button onClick={onEdit} className='p-1 rounded text-text-secondary hover:text-primary shrink-0' title={t('cm.edit')}><Pencil className='w-3.5 h-3.5' /></button>
+        <button onClick={onDelete} className='p-1 rounded text-text-secondary hover:text-accent shrink-0'><Trash2 className='w-3.5 h-3.5' /></button>
+      </div>
+      {video.description && <p className='text-[11px] text-text-secondary/70 mt-1 ml-8 line-clamp-2'>{video.description}</p>}
     </li>
   )
 }
 
 /* ─── Single course: playlists + videos + add video (YouTube/Upload) ─── */
+type VForm = { source: 'youtube' | 'upload'; title: string; description: string; url: string; uploading: boolean; progress: number }
+const emptyVForm = (): VForm => ({ source: 'youtube', title: '', description: '', url: '', uploading: false, progress: 0 })
+
 function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDetail; onBack: () => void; onRefresh: () => void }) {
   const { t } = useT()
   const toast = useToast()
   const dialog = useDialog()
   const [newPlaylist, setNewPlaylist] = useState('')
-  // Per-playlist add-video form state
-  const [vForms, setVForms] = useState<Record<string, { source: 'youtube' | 'upload'; title: string; url: string; uploading: boolean }>>({})
+  const [vForms, setVForms] = useState<Record<string, VForm>>({})
+  // Course edit
+  const [editingCourse, setEditingCourse] = useState(false)
+  const [courseEdit, setCourseEdit] = useState<CourseInput>({ title: course.title, category: course.category, instructor: course.instructor, language: course.language, level: course.level, durationLabel: course.durationLabel, isPremium: course.isPremium })
+  const [savingCourse, setSavingCourse] = useState(false)
+  // Inline video edit
+  const [editingVideo, setEditingVideo] = useState<string | null>(null)
+  const [videoEdit, setVideoEdit] = useState<{ title: string; description: string; url: string }>({ title: '', description: '', url: '' })
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  const vf = (pid: string) => vForms[pid] ?? { source: 'youtube' as const, title: '', url: '', uploading: false }
-  const setVF = (pid: string, patch: Partial<{ source: 'youtube' | 'upload'; title: string; url: string; uploading: boolean }>) =>
+  const vf = (pid: string) => vForms[pid] ?? emptyVForm()
+  const setVF = (pid: string, patch: Partial<VForm>) =>
     setVForms(s => ({ ...s, [pid]: { ...vf(pid), ...patch } }))
+
+  async function saveCourse() {
+    setSavingCourse(true)
+    try {
+      await api.courses.updateCourse(course._id, courseEdit)
+      setEditingCourse(false); onRefresh(); toast.success(t('cm.save'))
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
+    finally { setSavingCourse(false) }
+  }
 
   async function addPlaylist() {
     if (!newPlaylist.trim()) return
@@ -219,23 +255,37 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
 
   async function addYoutubeVideo(playlistId: string) {
     const f = vf(playlistId)
-    if (!f.title.trim() || !f.url.trim()) return
+    if (!f.title.trim() || !f.url.trim()) { toast.error(t('cm.videoTitle')); return }
     try {
-      await api.courses.createVideo(playlistId, { title: f.title.trim(), source: 'youtube', url: f.url.trim() })
-      setVF(playlistId, { title: '', url: '' }); onRefresh()
+      await api.courses.createVideo(playlistId, { title: f.title.trim(), source: 'youtube', url: f.url.trim(), description: f.description.trim() })
+      setVForms(s => ({ ...s, [playlistId]: emptyVForm() })); onRefresh()
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
   }
 
   async function addUploadVideo(playlistId: string, file: File) {
     const f = vf(playlistId)
     const title = f.title.trim() || file.name.replace(/\.[^.]+$/, '')
-    setVF(playlistId, { uploading: true })
+    setVF(playlistId, { uploading: true, progress: 0 })
     try {
-      const url = await uploadFile(file)
-      await api.courses.createVideo(playlistId, { title, source: 'upload', videoUrl: url })
-      setVF(playlistId, { title: '', uploading: false }); onRefresh()
+      const url = await uploadFile(file, p => setVF(playlistId, { progress: p }))
+      await api.courses.createVideo(playlistId, { title, source: 'upload', videoUrl: url, description: f.description.trim() })
+      setVForms(s => ({ ...s, [playlistId]: emptyVForm() })); onRefresh()
       toast.success(t('cm.uploaded'))
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik'); setVF(playlistId, { uploading: false }) }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik'); setVF(playlistId, { uploading: false, progress: 0 }) }
+  }
+
+  function startEditVideo(v: CourseVideo) {
+    setEditingVideo(v._id)
+    setVideoEdit({ title: v.title, description: v.description || '', url: v.youtubeId ? `https://youtu.be/${v.youtubeId}` : '' })
+  }
+  async function saveVideo(v: CourseVideo) {
+    try {
+      const payload: { title: string; description: string; url?: string } = { title: videoEdit.title.trim(), description: videoEdit.description.trim() }
+      // Only YouTube videos can change their URL here; uploads keep their file.
+      if (v.source !== 'upload' && videoEdit.url.trim()) payload.url = videoEdit.url.trim()
+      await api.courses.updateVideo(v._id, payload)
+      setEditingVideo(null); onRefresh(); toast.success(t('cm.save'))
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
   }
 
   async function delVideo(id: string) {
@@ -257,10 +307,46 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
   return (
     <motion.div initial='hidden' animate='visible' variants={fadeIn} className='space-y-4'>
       <button onClick={onBack} className='text-sm text-primary hover:underline'>← {t('cm.backToCourses')}</button>
-      <div>
-        <h2 className='text-lg font-semibold text-text-primary'>{course.title}</h2>
-        <p className='text-xs text-text-secondary'>{course.category} · {course.level}{course.isPremium ? ' · Premium' : ''}</p>
-      </div>
+
+      {editingCourse ? (
+        <Card hover={false}>
+          <div className='space-y-3'>
+            <input value={courseEdit.title} onChange={e => setCourseEdit(f => ({ ...f, title: e.target.value }))} placeholder={t('cm.courseTitle')} className={inputCls} />
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+              <input value={courseEdit.category} onChange={e => setCourseEdit(f => ({ ...f, category: e.target.value }))} placeholder={t('cm.category')} className={inputCls} />
+              <input value={courseEdit.instructor} onChange={e => setCourseEdit(f => ({ ...f, instructor: e.target.value }))} placeholder={t('cm.instructor')} className={inputCls} />
+            </div>
+            <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
+              <select value={courseEdit.language} onChange={e => setCourseEdit(f => ({ ...f, language: e.target.value as CourseInput['language'] }))} className={inputCls}>
+                <option value='uz'>O&apos;zbekcha</option><option value='ru'>Русский</option><option value='en'>English</option>
+              </select>
+              <select value={courseEdit.level} onChange={e => setCourseEdit(f => ({ ...f, level: e.target.value as CourseInput['level'] }))} className={inputCls}>
+                <option value='beginner'>{t('cm.levelBeginner')}</option>
+                <option value='intermediate'>{t('cm.levelIntermediate')}</option>
+                <option value='advanced'>{t('cm.levelAdvanced')}</option>
+              </select>
+              <input value={courseEdit.durationLabel} onChange={e => setCourseEdit(f => ({ ...f, durationLabel: e.target.value }))} placeholder={t('cm.duration')} className={inputCls} />
+            </div>
+            <label className='flex items-center gap-2 text-sm text-text-secondary'>
+              <input type='checkbox' checked={courseEdit.isPremium} onChange={e => setCourseEdit(f => ({ ...f, isPremium: e.target.checked }))} /> {t('cm.premiumCourse')}
+            </label>
+            <div className='flex gap-2'>
+              <Button size='sm' onClick={saveCourse} disabled={savingCourse}>{savingCourse ? <Loader2 className='w-4 h-4 animate-spin' /> : <Check className='w-4 h-4' />} {t('cm.save')}</Button>
+              <Button size='sm' variant='secondary' onClick={() => setEditingCourse(false)}>{t('cm.cancel')}</Button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div className='flex items-start justify-between gap-3'>
+          <div>
+            <h2 className='text-lg font-semibold text-text-primary'>{course.title}</h2>
+            <p className='text-xs text-text-secondary'>{course.category} · {course.level}{course.instructor ? ' · ' + course.instructor : ''}{course.isPremium ? ' · Premium' : ''}</p>
+          </div>
+          <Button size='sm' variant='secondary' onClick={() => { setCourseEdit({ title: course.title, category: course.category, instructor: course.instructor, language: course.language, level: course.level, durationLabel: course.durationLabel, isPremium: course.isPremium }); setEditingCourse(true) }}>
+            <Pencil className='w-4 h-4' /> {t('cm.edit')}
+          </Button>
+        </div>
+      )}
 
       <div className='flex gap-2'>
         <input value={newPlaylist} onChange={e => setNewPlaylist(e.target.value)} placeholder={t('cm.newPlaylist')} className={inputCls} />
@@ -286,7 +372,23 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={e => onDragEnd(pl, e)}>
                   <SortableContext items={pl.videos.map(v => v._id)} strategy={verticalListSortingStrategy}>
                     <ul className='space-y-1.5 mb-3'>
-                      {pl.videos.map(v => <SortableVideo key={v._id} video={v} onDelete={() => delVideo(v._id)} />)}
+                      {pl.videos.map(v => (
+                        editingVideo === v._id ? (
+                          <li key={v._id} className='bg-surface-light rounded-lg p-2.5 space-y-2'>
+                            <input value={videoEdit.title} onChange={e => setVideoEdit(s => ({ ...s, title: e.target.value }))} placeholder={t('cm.videoTitle')} className={inputCls} />
+                            <textarea value={videoEdit.description} onChange={e => setVideoEdit(s => ({ ...s, description: e.target.value }))} placeholder={t('cm.videoDescription')} rows={2} className={inputCls} />
+                            {v.source !== 'upload' && (
+                              <input value={videoEdit.url} onChange={e => setVideoEdit(s => ({ ...s, url: e.target.value }))} placeholder={t('cm.youtubeUrl')} className={inputCls} />
+                            )}
+                            <div className='flex gap-2'>
+                              <Button size='sm' onClick={() => saveVideo(v)}><Check className='w-4 h-4' /> {t('cm.save')}</Button>
+                              <Button size='sm' variant='secondary' onClick={() => setEditingVideo(null)}><X className='w-4 h-4' /> {t('cm.cancel')}</Button>
+                            </div>
+                          </li>
+                        ) : (
+                          <SortableVideo key={v._id} video={v} onDelete={() => delVideo(v._id)} onEdit={() => startEditVideo(v)} />
+                        )
+                      ))}
                     </ul>
                   </SortableContext>
                 </DndContext>
@@ -306,17 +408,28 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
                 </div>
 
                 <input value={f.title} onChange={e => setVF(pl._id, { title: e.target.value })} placeholder={t('cm.videoTitle')} className={inputCls} />
+                <textarea value={f.description} onChange={e => setVF(pl._id, { description: e.target.value })} placeholder={t('cm.videoDescription')} rows={2} className={inputCls} />
 
                 {f.source === 'youtube' ? (
                   <div className='flex flex-col sm:flex-row gap-2'>
                     <input value={f.url} onChange={e => setVF(pl._id, { url: e.target.value })} placeholder={t('cm.youtubeUrl')} className={inputCls} />
-                    <Button size='sm' onClick={() => addYoutubeVideo(pl._id)}><Plus className='w-4 h-4' /> {t('cm.addVideo')}</Button>
+                    <Button size='sm' type='button' className='shrink-0' onClick={() => addYoutubeVideo(pl._id)}><Plus className='w-4 h-4' /> {t('cm.addVideo')}</Button>
+                  </div>
+                ) : f.uploading ? (
+                  <div className='w-full border-2 border-dashed border-primary/40 rounded-xl p-4'>
+                    <div className='flex items-center justify-between text-xs text-text-secondary mb-2'>
+                      <span className='flex items-center gap-2'><Loader2 className='w-4 h-4 animate-spin' /> {t('cm.uploading')}</span>
+                      <span className='font-semibold text-primary'>{f.progress}%</span>
+                    </div>
+                    <div className='h-2 rounded-full bg-surface overflow-hidden'>
+                      <div className='h-full bg-primary transition-all' style={{ width: `${f.progress}%` }} />
+                    </div>
                   </div>
                 ) : (
                   <label className='flex items-center justify-center gap-2 w-full h-16 border-2 border-dashed border-border rounded-xl cursor-pointer text-text-secondary hover:border-primary/50 hover:text-primary text-xs'>
-                    <input type='file' accept='video/mp4,video/webm' className='hidden' disabled={f.uploading}
+                    <input type='file' accept='video/mp4,video/webm' className='hidden'
                       onChange={e => { const file = e.target.files?.[0]; if (file) addUploadVideo(pl._id, file) }} />
-                    {f.uploading ? <><Loader2 className='w-4 h-4 animate-spin' /> {t('cm.uploading')}</> : <><Upload className='w-4 h-4' /> {t('cm.selectVideoFile')}</>}
+                    <Upload className='w-4 h-4' /> {t('cm.selectVideoFile')}
                   </label>
                 )}
               </div>
