@@ -28,12 +28,16 @@ const FALLBACK_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://med-ai-simulator.vercel.app',
+  'https://medaisimulator.uz',
+  'https://www.medaisimulator.uz',
 ]
 
-const allowedOrigins = (process.env.CLIENT_ORIGINS || FALLBACK_ORIGINS.join(','))
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean)
+// CLIENT_ORIGINS env qo'shilsa, fallback bilan birlashtiriladi (almashtirmaydi),
+// shunda production domeni env unutilsa ham CORS ishlaydi.
+const allowedOrigins = [
+  ...FALLBACK_ORIGINS,
+  ...(process.env.CLIENT_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean),
+]
 
 function resolveUploadsDir(): string {
   if (process.env.VERCEL) {
@@ -71,7 +75,12 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true)
-      if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      // Allow listed origins, any *.vercel.app, and any *.medaisimulator.uz subdomain.
+      if (
+        allowedOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin) ||
+        /^https?:\/\/([a-z0-9-]+\.)?medaisimulator\.uz$/.test(origin)
+      ) {
         return callback(null, true)
       }
       return callback(new Error('CORS: origin ruxsat etilmagan'))

@@ -88,47 +88,60 @@ const features = [
 
 const plans = [
 	{
-		name: 'FREE',
+		name: 'BEPUL',
 		price: 'Bepul',
 		period: '',
-		description: "Har yo'nalishdan 3 ta case",
+		description: 'Tanishish uchun',
 		features: [
-			'3 ta case har kategoriya',
-			'Asosiy AI baholash',
-			"Natija ko'rish",
-			'Cheklangan statistika',
+			'Kuniga 1 ta klinik holat',
+			'AI chatga 5 ta savol/kun',
+			'3 ta 3D anatomiya modeli',
+			'Asosiy statistika',
 		],
 		cta: 'Bepul Boshlash',
 		popular: false,
 	},
 	{
-		name: 'PRO',
-		price: '40,000',
+		name: 'PRO — 1 oy',
+		price: '60,000',
 		period: "so'm/oy",
-		description: 'Barcha klinik holatlar, AI tahlil, Karyera maslahat',
+		description: 'Barcha klinik holatlar va AI tahlil',
 		features: [
-			'500+ case kirish',
+			'Barcha klinik holatlar',
+			'Cheksiz urinishlar',
 			'Batafsil AI tahlil',
-			'Karyera maslahatchi',
-			'Jarrohlik simulyatsiya',
-			'Priority support',
+			'Shoshilinch rejim',
+			'Barcha 3D modellar',
 			'Sertifikat',
 		],
 		cta: "PRO ga O'tish",
 		popular: true,
 	},
 	{
-		name: 'CLINIC B2B',
-		price: '2,500,000',
-		period: "so'm/oy",
-		description: '80 foydalanuvchi, boshqaruv panel',
+		name: 'PRO — 1 yil',
+		price: '550,000',
+		period: "so'm/yil",
+		description: 'Eng katta chegirma · 365 kun',
 		features: [
-			'80 foydalanuvchi',
+			'Oylikning barcha imkoniyatlari',
+			'170,000 so\'m tejaysiz',
+			'Yil davomida uzluksiz',
+			'Eng yaxshi tanlov',
+		],
+		cta: "PRO ga O'tish",
+		popular: false,
+	},
+	{
+		name: 'Universitet / Klinika',
+		price: 'Kelishiladi',
+		period: '',
+		description: 'Tashkilotlar uchun maxsus tarif',
+		features: [
+			'Ko\'p foydalanuvchi',
 			'Boshqaruv paneli',
 			'Analitika dashboard',
-			'Maxsus klinik holatlar yaratish',
-			'API integration',
-			'24/7 Support',
+			'Maxsus klinik holatlar',
+			'Admin bilan kelishiladi',
 		],
 		cta: "Bog'lanish",
 		popular: false,
@@ -224,7 +237,7 @@ export default function LandingPage() {
 			<Navbar />
 
 			{/* Hero Section */}
-			<section className='relative pt-32 pb-20 overflow-hidden'>
+			<section className='relative pt-20 pb-20 overflow-hidden'>
 				<div className='absolute inset-0 animate-gradient-mesh opacity-30' />
 				<div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-primary/10 rounded-full blur-[120px]' />
 
@@ -411,11 +424,11 @@ export default function LandingPage() {
 						</motion.p>
 					</SectionWrapper>
 
-					<SectionWrapper className='grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto'>
+					<SectionWrapper className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto'>
 						{plans.map(plan => (
 							<motion.div key={plan.name} variants={fadeInUp}>
 								<div
-									className={`relative rounded-2xl border p-8 h-full flex flex-col ${
+									className={`relative rounded-2xl border p-6 h-full flex flex-col ${
 										plan.popular
 											? 'border-primary bg-surface shadow-xl shadow-primary/10'
 											: 'border-border bg-surface'
@@ -432,7 +445,7 @@ export default function LandingPage() {
 											{plan.name}
 										</h3>
 										<div className='flex items-end gap-1'>
-											<span className='text-3xl font-bold text-text-primary'>
+											<span className={`font-bold text-text-primary ${plan.price.length > 7 ? 'text-2xl' : 'text-3xl'}`}>
 												{plan.price}
 											</span>
 											{plan.period && (
@@ -457,7 +470,7 @@ export default function LandingPage() {
 										))}
 									</ul>
 
-									<Link href='/dashboard'>
+									<Link href={plan.cta === "Bog'lanish" ? '/contact' : '/register'}>
 										<Button
 											variant={plan.popular ? 'primary' : 'secondary'}
 											className='w-full'
