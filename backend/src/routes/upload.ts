@@ -36,7 +36,9 @@ const fileFilter = (_req: express.Request, file: Express.Multer.File, cb: multer
 
 // Always buffer in memory; the storage backend (Spaces vs disk) is decided per
 // request inside the handler so env vars are read after dotenv has loaded.
-const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { fileSize: 50 * 1024 * 1024 } })
+// 200MB — videos (mp4/webm) need more room than images/PDFs. Spaces upload
+// buffers in memory, so this is capped to stay safe on a small-RAM server.
+const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { fileSize: 200 * 1024 * 1024 } })
 
 function saveToDisk(file: Express.Multer.File): string {
   let dir = resolveUploadDir()

@@ -19,7 +19,7 @@ import {
     updateCategory,
     updateUser,
 } from '../controllers/adminController'
-import { getCaseStats, getReferralAnalytics, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
+import { getCaseStats, getCMDashboard, getReferralAnalytics, getRevenueAnalytics, getServerHealth } from '../controllers/analyticsController'
 import {
     deleteTicket,
     getSupportStats,
@@ -46,6 +46,9 @@ router.use(protect)
 
 // Categories readable by admin + instructor (content managers need them)
 router.get('/categories', restrictTo('admin', 'instructor'), getCategories)
+
+// Content Manager dashboard — admin + instructor (content managers)
+router.get('/cm-dashboard', restrictTo('admin', 'instructor'), getCMDashboard)
 
 // Everything else: admin only
 router.use(restrictTo('admin'))

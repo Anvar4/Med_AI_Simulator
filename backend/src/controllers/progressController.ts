@@ -2,8 +2,30 @@ import { Request, Response } from 'express'
 import { AuthRequest } from '../middleware/auth'
 import { Certificate, generateSerial } from '../models/Certificate'
 import { Course } from '../models/Course'
+import { Exam } from '../models/Exam'
+import { ExamAttempt } from '../models/ExamAttempt'
+import { notify } from '../models/Notification'
 import { Video } from '../models/Video'
 import { VideoProgress } from '../models/VideoProgress'
+
+// Motivational milestones (course completion %). When a user crosses one of
+// these by completing a video, they get an in-app notification.
+const MILESTONES = [25, 50, 75, 100] as const
+
+function milestoneMessage(percent: number, courseTitle: string): { title: string; message: string } | null {
+  switch (percent) {
+    case 25:
+      return { title: 'Ajoyib boshlanish! 🎯', message: `"${courseTitle}" kursining 25% qismini tugatdingiz. Davom eting!` }
+    case 50:
+      return { title: 'Yarmidasiz! 🔥', message: `"${courseTitle}" kursining yarmini tugatdingiz. Zo'r ketyapsiz!` }
+    case 75:
+      return { title: 'Deyarli tayyor! 💪', message: `"${courseTitle}" kursining 75% qismini tugatdingiz. Oz qoldi!` }
+    case 100:
+      return { title: 'Tabriklaymiz! 🏆', message: `"${courseTitle}" kursini to'liq tugatdingiz. Sertifikatingizni oling!` }
+    default:
+      return null
+  }
+}
 
 const COMPLETION_THRESHOLD = 0.9
 // When a video's duration is unknown (YouTube length not stored), require this
@@ -77,13 +99,49 @@ export const saveVideoProgress = async (req: AuthRequest, res: Response): Promis
       { new: true, upsert: true, setDefaultsOnInsert: true }
     )
 
-    // If this completion finishes the course, issue a certificate.
+    // If this completion finishes the course, issue a certificate; and when a
+    // milestone (25/50/75/100%) is newly crossed, send a motivational notice.
     let certificate = null
     if (progress.completed && !wasCompleted) {
       certificate = await maybeIssueCertificate(req.user!._id.toString(), video.course.toString(), req.user!.name)
+
+      try {
+        const [totalVideos, completedVideos, course] = await Promise.all([
+          Video.countDocuments({ course: video.course, isPublished: true }),
+          VideoProgress.countDocuments({ user: req.user!._id, course: video.course, completed: true }),
+          Course.findById(video.course).select('title'),
+        ])
+        if (totalVideos > 0 && course) {
+          const newPercent = Math.round((completedVideos / totalVideos) * 100)
+          // Percent before this video completed (one fewer completed video).
+          const prevPercent = Math.round(((completedVideos - 1) / totalVideos) * 100)
+          for (const m of MILESTONES) {
+            if (prevPercent < m && newPercent >= m) {
+              const msg = milestoneMessage(m, course.title)
+              if (msg) await notify(req.user!._id, msg.title, msg.message, m === 100 ? 'success' : 'info')
+            }
+          }
+        }
+      } catch { /* bildirishnoma muvaffaqiyatsizligi progressni buzmasin */ }
     }
 
-    res.json({ status: 'success', progress, certificate })
+    // Tell the client whether a (not-yet-passed) exam now gates the certificate.
+    let examRequired = false
+    if (!certificate) {
+      const [totalVideos, completedVideos] = await Promise.all([
+        Video.countDocuments({ course: video.course, isPublished: true }),
+        VideoProgress.countDocuments({ user: req.user!._id, course: video.course, completed: true }),
+      ])
+      if (totalVideos > 0 && completedVideos >= totalVideos) {
+        const exam = await Exam.findOne({ course: video.course, isPublished: true }).select('_id')
+        if (exam) {
+          const passed = await ExamAttempt.exists({ user: req.user!._id, exam: exam._id, passed: true })
+          examRequired = !passed
+        }
+      }
+    }
+
+    res.json({ status: 'success', progress, certificate, examRequired })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }
@@ -108,6 +166,13 @@ export async function maybeIssueCertificate(
     completed: true,
   })
   if (completedVideos < totalVideos) return null
+
+  // If the course has a published exam, the user must also have passed it.
+  const exam = await Exam.findOne({ course: courseId, isPublished: true }).select('_id')
+  if (exam) {
+    const passed = await ExamAttempt.exists({ user: userId, exam: exam._id, passed: true })
+    if (!passed) return null
+  }
 
   const existing = await Certificate.findOne({ user: userId, course: courseId })
   if (existing) return existing

@@ -177,6 +177,10 @@ export const api = {
     getSystemStats: () =>
       request<{ status: string; stats: AdminStats }>('/admin/stats'),
 
+    // Content Manager dashboard (admin + instructor)
+    getCMDashboard: () =>
+      request<{ status: string; dashboard: CMDashboardStats }>('/admin/cm-dashboard'),
+
     getRecentActivity: () =>
       request<{ status: string; recentUsers: BackendUser[]; recentAttempts: unknown[] }>('/admin/activity'),
 
@@ -433,12 +437,13 @@ export const api = {
 
   // ─── Courses (DB-driven video courses) ──────────────────────
   courses: {
-    list: (params: { category?: string; search?: string; level?: string; page?: number } = {}) => {
+    list: (params: { category?: string; search?: string; level?: string; page?: number; mine?: boolean } = {}) => {
       const qs = new URLSearchParams()
       if (params.category) qs.set('category', params.category)
       if (params.search) qs.set('search', params.search)
       if (params.level) qs.set('level', params.level)
       if (params.page) qs.set('page', String(params.page))
+      if (params.mine) qs.set('mine', 'true')
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
       return request<{ status: string; total: number; totalPages: number; currentPage: number; courses: CourseSummary[] }>(
         `/courses${suffix}`
@@ -488,16 +493,55 @@ export const api = {
     deletePlaylist: (id: string) =>
       request<{ status: string; message: string }>(`/courses/playlists/${id}`, { method: 'DELETE' }),
 
-    createVideo: (playlistId: string, data: { title: string; url: string; description?: string; durationSeconds?: number; order?: number }) =>
+    createVideo: (playlistId: string, data: { title: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/playlists/${playlistId}/videos`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateVideo: (id: string, data: { title?: string; url?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
+    updateVideo: (id: string, data: { title?: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/videos/${id}`, {
         method: 'PATCH', body: JSON.stringify(data),
       }),
     deleteVideo: (id: string) =>
       request<{ status: string; message: string }>(`/courses/videos/${id}`, { method: 'DELETE' }),
+
+    // Drag & drop reorder (CM / admin)
+    reorderVideos: (playlistId: string, videoIds: string[]) =>
+      request<{ status: string; count: number }>(`/courses/playlists/${playlistId}/reorder`, {
+        method: 'PATCH', body: JSON.stringify({ videoIds }),
+      }),
+    reorderPlaylists: (courseId: string, playlistIds: string[]) =>
+      request<{ status: string; count: number }>(`/courses/${courseId}/playlists/reorder`, {
+        method: 'PATCH', body: JSON.stringify({ playlistIds }),
+      }),
+  },
+
+  // ─── Exams (course final exam) ─────────────────────────────
+  exams: {
+    // CM / admin
+    getAdmin: (courseId: string) =>
+      request<{ status: string; exam: ExamSettings | null; questions: AdminQuestion[] }>(`/courses/${courseId}/exam-admin`),
+    upsert: (courseId: string, data: Partial<Pick<ExamSettings, 'title' | 'description' | 'passingScore' | 'rewardPoints' | 'isPublished'>>) =>
+      request<{ status: string; exam: ExamSettings }>(`/courses/${courseId}/exam-admin`, {
+        method: 'PUT', body: JSON.stringify(data),
+      }),
+    createQuestion: (courseId: string, data: QuestionInput) =>
+      request<{ status: string; question: AdminQuestion }>(`/courses/${courseId}/exam-admin/questions`, {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    updateQuestion: (id: string, data: QuestionInput) =>
+      request<{ status: string; question: AdminQuestion }>(`/courses/exam-questions/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    deleteQuestion: (id: string) =>
+      request<{ status: string; message: string }>(`/courses/exam-questions/${id}`, { method: 'DELETE' }),
+
+    // User
+    getForUser: (courseId: string) =>
+      request<{ status: string; exam: UserExam | null; questions: UserQuestion[]; best: { scorePercent: number; passed: boolean } | null }>(`/courses/${courseId}/exam`),
+    submit: (examId: string, answers: ExamAnswerInput[]) =>
+      request<{ status: string; result: ExamResult; certificate: CourseCertificate | null }>(`/courses/exams/${examId}/submit`, {
+        method: 'POST', body: JSON.stringify({ answers }),
+      }),
   },
 
   // ─── Speech-to-Text (voice input) ──────────────────────────
@@ -669,6 +713,37 @@ export interface CaseStats {
   byStatus: { status: string; count: number }[]
 }
 
+export interface CMDashboardStats {
+  // Content counts
+  totalCases: number
+  totalEmergencyCases: number
+  totalCourses: number
+  totalPlaylists: number
+  totalVideos: number
+  totalCertificates: number
+  totalCategories: number
+  // Publishing state
+  publishedCases: number
+  draftCases: number
+  reviewCases: number
+  // Users & usage
+  totalUsers: number
+  premiumUsers: number
+  totalAttempts: number
+  completedAttempts: number
+  completionRate: number
+  avgScore: number
+  // Modules without models yet (0 for now, filled in later stages)
+  totalBooks: number
+  totalExams: number
+  totalQuestions: number
+  // Breakdowns for charts
+  casesByCategory: { category: string; count: number }[]
+  casesByDifficulty: { level: number; count: number }[]
+  casesByType: { type: string; count: number }[]
+  casesByStatus: { status: string; count: number }[]
+}
+
 export interface ServerHealth {
   healthLevel: 'healthy' | 'busy' | 'critical'
   uptimeSeconds: number
@@ -711,6 +786,9 @@ export interface CourseInput {
   description?: string
   category?: string
   author?: string
+  instructor?: string
+  language?: 'uz' | 'ru' | 'en'
+  durationLabel?: string
   level?: 'beginner' | 'intermediate' | 'advanced'
   isPremium?: boolean
   coverImage?: string
@@ -723,6 +801,9 @@ export interface CourseSummary {
   description: string
   category: string
   author: string
+  instructor?: string
+  language?: 'uz' | 'ru' | 'en'
+  durationLabel?: string
   coverImage?: string
   level: 'beginner' | 'intermediate' | 'advanced'
   isPremium: boolean
@@ -733,7 +814,9 @@ export interface CourseVideo {
   _id: string
   title: string
   description: string
-  youtubeId: string
+  source?: 'youtube' | 'upload'
+  youtubeId?: string
+  videoUrl?: string
   durationSeconds: number
   order: number
   completed?: boolean
@@ -760,6 +843,71 @@ export interface CourseCertificate {
   courseTitle: string
   issuedAt: string
   course?: { _id: string; title: string; slug: string } | string
+}
+
+// ─── Exam ──────────────────────────────────────────────────────
+export type QuestionType = 'single' | 'multiple' | 'truefalse' | 'short'
+
+export interface ExamSettings {
+  _id?: string
+  title: string
+  description: string
+  passingScore: number
+  rewardPoints: number
+  isPublished: boolean
+}
+
+/** Admin/CM view — includes the answer key (isCorrect / correctText). */
+export interface AdminQuestion {
+  _id: string
+  type: QuestionType
+  text: string
+  options: { _id?: string; text: string; isCorrect: boolean }[]
+  correctText: string[]
+  points: number
+  order: number
+  explanation?: string
+}
+
+/** User view — answer key stripped. */
+export interface UserQuestion {
+  _id: string
+  type: QuestionType
+  text: string
+  points: number
+  options: { _id: string; text: string }[]
+}
+
+export interface UserExam {
+  _id: string
+  title: string
+  description: string
+  passingScore: number
+  rewardPoints: number
+  questionCount: number
+}
+
+export interface ExamResult {
+  scorePercent: number
+  passed: boolean
+  passingScore: number
+  earnedPoints: number
+  attemptId: string
+}
+
+export interface QuestionInput {
+  type: QuestionType
+  text: string
+  options?: { text: string; isCorrect?: boolean }[]
+  correctText?: string[]
+  points?: number
+  explanation?: string
+}
+
+export interface ExamAnswerInput {
+  question: string
+  selected?: string[]
+  textAnswer?: string
 }
 
 export interface UserSubscription {
