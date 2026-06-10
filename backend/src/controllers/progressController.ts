@@ -2,6 +2,8 @@ import { Request, Response } from 'express'
 import { AuthRequest } from '../middleware/auth'
 import { Certificate, generateSerial } from '../models/Certificate'
 import { Course } from '../models/Course'
+import { Exam } from '../models/Exam'
+import { ExamAttempt } from '../models/ExamAttempt'
 import { notify } from '../models/Notification'
 import { Video } from '../models/Video'
 import { VideoProgress } from '../models/VideoProgress'
@@ -123,7 +125,23 @@ export const saveVideoProgress = async (req: AuthRequest, res: Response): Promis
       } catch { /* bildirishnoma muvaffaqiyatsizligi progressni buzmasin */ }
     }
 
-    res.json({ status: 'success', progress, certificate })
+    // Tell the client whether a (not-yet-passed) exam now gates the certificate.
+    let examRequired = false
+    if (!certificate) {
+      const [totalVideos, completedVideos] = await Promise.all([
+        Video.countDocuments({ course: video.course, isPublished: true }),
+        VideoProgress.countDocuments({ user: req.user!._id, course: video.course, completed: true }),
+      ])
+      if (totalVideos > 0 && completedVideos >= totalVideos) {
+        const exam = await Exam.findOne({ course: video.course, isPublished: true }).select('_id')
+        if (exam) {
+          const passed = await ExamAttempt.exists({ user: req.user!._id, exam: exam._id, passed: true })
+          examRequired = !passed
+        }
+      }
+    }
+
+    res.json({ status: 'success', progress, certificate, examRequired })
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }
@@ -148,6 +166,13 @@ export async function maybeIssueCertificate(
     completed: true,
   })
   if (completedVideos < totalVideos) return null
+
+  // If the course has a published exam, the user must also have passed it.
+  const exam = await Exam.findOne({ course: courseId, isPublished: true }).select('_id')
+  if (exam) {
+    const passed = await ExamAttempt.exists({ user: userId, exam: exam._id, passed: true })
+    if (!passed) return null
+  }
 
   const existing = await Certificate.findOne({ user: userId, course: courseId })
   if (existing) return existing

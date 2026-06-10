@@ -2,7 +2,7 @@
 
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
-import { api, CourseDetail, CourseInput, CoursePlaylist, CourseSummary, CourseVideo } from '@/lib/api'
+import { AdminQuestion, api, CourseDetail, CourseInput, CoursePlaylist, CourseSummary, CourseVideo, ExamSettings, QuestionInput, QuestionType } from '@/lib/api'
 import { useDialog } from '@/lib/dialog-context'
 import { useT } from '@/lib/language-context'
 import { useToast } from '@/lib/toast-context'
@@ -22,7 +22,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { motion } from 'framer-motion'
-import { Check, Film, GripVertical, Loader2, Pencil, Play, Plus, Trash2, Upload, X } from 'lucide-react'
+import { Check, Film, GraduationCap, GripVertical, Loader2, Pencil, Play, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 const fadeIn = {
@@ -437,6 +437,177 @@ function CourseDetailManager({ course, onBack, onRefresh }: { course: CourseDeta
           )
         })
       )}
+
+      {/* Final exam management */}
+      <ExamManager courseId={course._id} />
     </motion.div>
+  )
+}
+
+/* ─── Final exam: settings + question bank ─── */
+const QTYPES: { value: QuestionType; labelKey: string }[] = [
+  { value: 'single', labelKey: 'exam.typeSingle' },
+  { value: 'multiple', labelKey: 'exam.typeMultiple' },
+  { value: 'truefalse', labelKey: 'exam.typeTrueFalse' },
+  { value: 'short', labelKey: 'exam.typeShort' },
+]
+
+function ExamManager({ courseId }: { courseId: string }) {
+  const { t } = useT()
+  const toast = useToast()
+  const dialog = useDialog()
+  const [exam, setExam] = useState<ExamSettings | null>(null)
+  const [questions, setQuestions] = useState<AdminQuestion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [passingScore, setPassingScore] = useState(70)
+  const [rewardPoints, setRewardPoints] = useState(50)
+
+  // New question form
+  const [qType, setQType] = useState<QuestionType>('single')
+  const [qText, setQText] = useState('')
+  const [qOptions, setQOptions] = useState<{ text: string; isCorrect: boolean }[]>([{ text: '', isCorrect: false }, { text: '', isCorrect: false }])
+  const [qShort, setQShort] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await api.exams.getAdmin(courseId)
+      setExam(res.exam)
+      setQuestions(res.questions)
+      if (res.exam) { setPassingScore(res.exam.passingScore); setRewardPoints(res.exam.rewardPoints) }
+    } catch { /* silent */ } finally { setLoading(false) }
+  }, [courseId])
+  useEffect(() => { load() }, [load])
+
+  async function saveSettings() {
+    try { const r = await api.exams.upsert(courseId, { passingScore, rewardPoints, isPublished: true }); setExam(r.exam); toast.success(t('cm.save')) }
+    catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
+  }
+
+  function resetQForm() {
+    setQText(''); setQShort('')
+    setQOptions(qType === 'truefalse'
+      ? [{ text: t('exam.true'), isCorrect: true }, { text: t('exam.false'), isCorrect: false }]
+      : [{ text: '', isCorrect: false }, { text: '', isCorrect: false }])
+  }
+
+  function changeType(tp: QuestionType) {
+    setQType(tp)
+    if (tp === 'truefalse') setQOptions([{ text: t('exam.true'), isCorrect: true }, { text: t('exam.false'), isCorrect: false }])
+    else if (qType === 'truefalse') setQOptions([{ text: '', isCorrect: false }, { text: '', isCorrect: false }])
+  }
+
+  function toggleCorrect(i: number) {
+    setQOptions(opts => opts.map((o, idx) => {
+      if (qType === 'single' || qType === 'truefalse') return { ...o, isCorrect: idx === i }
+      return idx === i ? { ...o, isCorrect: !o.isCorrect } : o
+    }))
+  }
+
+  async function addQuestion() {
+    if (!qText.trim()) { toast.error(t('exam.questionText')); return }
+    const payload: QuestionInput = { type: qType, text: qText.trim() }
+    if (qType === 'short') {
+      payload.correctText = qShort.split(',').map(s => s.trim()).filter(Boolean)
+    } else {
+      payload.options = qOptions.filter(o => o.text.trim()).map(o => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
+    }
+    try {
+      await api.exams.createQuestion(courseId, payload)
+      resetQForm(); load(); toast.success(t('exam.addQuestion'))
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
+  }
+
+  async function delQuestion(id: string) {
+    const ok = await dialog.confirm({ title: t('cm.delete'), message: t('exam.questionText'), danger: true, confirmText: t('cm.delete') })
+    if (!ok) return
+    try { await api.exams.deleteQuestion(id); load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Xatolik') }
+  }
+
+  if (loading) return null
+
+  return (
+    <Card hover={false}>
+      <div className='flex items-center gap-2 mb-4'>
+        <GraduationCap className='w-5 h-5 text-primary' />
+        <h3 className='text-base font-bold text-text-primary'>{t('exam.title')}</h3>
+        <span className='text-xs text-text-secondary'>({questions.length})</span>
+      </div>
+
+      {/* Settings */}
+      <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4'>
+        <div>
+          <label className='text-xs text-text-secondary mb-1 block'>{t('exam.passingScore')}</label>
+          <input type='number' min={0} max={100} value={passingScore} onChange={e => setPassingScore(+e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label className='text-xs text-text-secondary mb-1 block'>{t('exam.rewardPoints')}</label>
+          <input type='number' min={0} value={rewardPoints} onChange={e => setRewardPoints(+e.target.value)} className={inputCls} />
+        </div>
+        <div className='flex items-end'>
+          <Button size='sm' onClick={saveSettings}><Check className='w-4 h-4' /> {t('cm.save')}</Button>
+        </div>
+      </div>
+
+      {/* Questions list */}
+      {questions.length === 0 ? (
+        <p className='text-xs text-text-secondary/60 mb-3'>{t('exam.noQuestions')}</p>
+      ) : (
+        <ul className='space-y-2 mb-4'>
+          {questions.map((q, i) => (
+            <li key={q._id} className='bg-surface-light rounded-lg p-2.5'>
+              <div className='flex items-start gap-2'>
+                <span className='text-xs text-text-secondary/60 mt-0.5 shrink-0'>{i + 1}.</span>
+                <div className='flex-1'>
+                  <p className='text-sm text-text-primary'>{q.text}</p>
+                  <p className='text-[11px] text-text-secondary/70 mt-0.5'>
+                    {t(QTYPES.find(x => x.value === q.type)?.labelKey || 'exam.typeSingle')}
+                    {q.type !== 'short' && ' · ' + q.options.filter(o => o.isCorrect).length + ' ' + t('exam.correct').toLowerCase()}
+                  </p>
+                </div>
+                <button onClick={() => delQuestion(q._id)} className='p-1 rounded text-text-secondary hover:text-accent shrink-0'><Trash2 className='w-3.5 h-3.5' /></button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Add question form */}
+      <div className='border-t border-border pt-3 space-y-2'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+          <select value={qType} onChange={e => changeType(e.target.value as QuestionType)} className={inputCls}>
+            {QTYPES.map(qt => <option key={qt.value} value={qt.value}>{t(qt.labelKey)}</option>)}
+          </select>
+        </div>
+        <textarea value={qText} onChange={e => setQText(e.target.value)} placeholder={t('exam.questionText')} rows={2} className={inputCls} />
+
+        {qType === 'short' ? (
+          <input value={qShort} onChange={e => setQShort(e.target.value)} placeholder={t('exam.correctAnswers')} className={inputCls} />
+        ) : (
+          <div className='space-y-1.5'>
+            {qOptions.map((o, i) => (
+              <div key={i} className='flex items-center gap-2'>
+                <button type='button' onClick={() => toggleCorrect(i)} title={t('exam.correct')}
+                  className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${o.isCorrect ? 'bg-success text-white' : 'bg-surface border border-border text-text-secondary/40'}`}>
+                  <Check className='w-3.5 h-3.5' />
+                </button>
+                <input value={o.text} onChange={e => setQOptions(opts => opts.map((x, idx) => idx === i ? { ...x, text: e.target.value } : x))}
+                  placeholder={`${t('exam.option')} ${i + 1}`} disabled={qType === 'truefalse'} className={inputCls} />
+                {qType !== 'truefalse' && qOptions.length > 2 && (
+                  <button type='button' onClick={() => setQOptions(opts => opts.filter((_, idx) => idx !== i))} className='p-1 text-text-secondary hover:text-accent shrink-0'><X className='w-3.5 h-3.5' /></button>
+                )}
+              </div>
+            ))}
+            {qType !== 'truefalse' && (
+              <button type='button' onClick={() => setQOptions(opts => [...opts, { text: '', isCorrect: false }])} className='text-xs text-primary hover:underline flex items-center gap-1'>
+                <Plus className='w-3 h-3' /> {t('exam.addOption')}
+              </button>
+            )}
+          </div>
+        )}
+
+        <Button size='sm' onClick={addQuestion}><Plus className='w-4 h-4' /> {t('exam.addQuestion')}</Button>
+      </div>
+    </Card>
   )
 }

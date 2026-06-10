@@ -515,6 +515,35 @@ export const api = {
       }),
   },
 
+  // ─── Exams (course final exam) ─────────────────────────────
+  exams: {
+    // CM / admin
+    getAdmin: (courseId: string) =>
+      request<{ status: string; exam: ExamSettings | null; questions: AdminQuestion[] }>(`/courses/${courseId}/exam-admin`),
+    upsert: (courseId: string, data: Partial<Pick<ExamSettings, 'title' | 'description' | 'passingScore' | 'rewardPoints' | 'isPublished'>>) =>
+      request<{ status: string; exam: ExamSettings }>(`/courses/${courseId}/exam-admin`, {
+        method: 'PUT', body: JSON.stringify(data),
+      }),
+    createQuestion: (courseId: string, data: QuestionInput) =>
+      request<{ status: string; question: AdminQuestion }>(`/courses/${courseId}/exam-admin/questions`, {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    updateQuestion: (id: string, data: QuestionInput) =>
+      request<{ status: string; question: AdminQuestion }>(`/courses/exam-questions/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    deleteQuestion: (id: string) =>
+      request<{ status: string; message: string }>(`/courses/exam-questions/${id}`, { method: 'DELETE' }),
+
+    // User
+    getForUser: (courseId: string) =>
+      request<{ status: string; exam: UserExam | null; questions: UserQuestion[]; best: { scorePercent: number; passed: boolean } | null }>(`/courses/${courseId}/exam`),
+    submit: (examId: string, answers: ExamAnswerInput[]) =>
+      request<{ status: string; result: ExamResult; certificate: CourseCertificate | null }>(`/courses/exams/${examId}/submit`, {
+        method: 'POST', body: JSON.stringify({ answers }),
+      }),
+  },
+
   // ─── Speech-to-Text (voice input) ──────────────────────────
   stt: {
     transcribe: async (audio: Blob, language: 'uz' | 'ru' | 'en' = 'uz'): Promise<{ status: string; text: string }> => {
@@ -814,6 +843,71 @@ export interface CourseCertificate {
   courseTitle: string
   issuedAt: string
   course?: { _id: string; title: string; slug: string } | string
+}
+
+// ─── Exam ──────────────────────────────────────────────────────
+export type QuestionType = 'single' | 'multiple' | 'truefalse' | 'short'
+
+export interface ExamSettings {
+  _id?: string
+  title: string
+  description: string
+  passingScore: number
+  rewardPoints: number
+  isPublished: boolean
+}
+
+/** Admin/CM view — includes the answer key (isCorrect / correctText). */
+export interface AdminQuestion {
+  _id: string
+  type: QuestionType
+  text: string
+  options: { _id?: string; text: string; isCorrect: boolean }[]
+  correctText: string[]
+  points: number
+  order: number
+  explanation?: string
+}
+
+/** User view — answer key stripped. */
+export interface UserQuestion {
+  _id: string
+  type: QuestionType
+  text: string
+  points: number
+  options: { _id: string; text: string }[]
+}
+
+export interface UserExam {
+  _id: string
+  title: string
+  description: string
+  passingScore: number
+  rewardPoints: number
+  questionCount: number
+}
+
+export interface ExamResult {
+  scorePercent: number
+  passed: boolean
+  passingScore: number
+  earnedPoints: number
+  attemptId: string
+}
+
+export interface QuestionInput {
+  type: QuestionType
+  text: string
+  options?: { text: string; isCorrect?: boolean }[]
+  correctText?: string[]
+  points?: number
+  explanation?: string
+}
+
+export interface ExamAnswerInput {
+  question: string
+  selected?: string[]
+  textAnswer?: string
 }
 
 export interface UserSubscription {

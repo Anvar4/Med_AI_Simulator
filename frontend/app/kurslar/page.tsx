@@ -1,9 +1,10 @@
 'use client'
 
 import Sidebar from '@/components/layout/Sidebar'
-import { api, CourseDetail, CourseSummary } from '@/lib/api'
+import { api, CourseDetail, CourseSummary, ExamResult, UserExam, UserQuestion } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { Award, ChevronLeft, Lock, PlayCircle, Search, User } from 'lucide-react'
+import { useT } from '@/lib/language-context'
+import { Award, CheckCircle2, ChevronLeft, GraduationCap, Lock, PlayCircle, Search, User, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /** Build a playable src for uploaded videos: absolute URLs pass through; a
@@ -118,6 +119,8 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [loading, setLoading] = useState(true)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [certMsg, setCertMsg] = useState<string | null>(null)
+  const [showExam, setShowExam] = useState(false)
+  const [examPassed, setExamPassed] = useState(false)
   // Tracks when the current video was opened, so "mark complete" reports real
   // elapsed watch time (the server requires a minimum before completing).
   const watchStartRef = useRef<number>(Date.now())
@@ -186,6 +189,11 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
         <div className='mb-5 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 text-emerald-600 text-sm font-medium'>
           <Award className='w-4 h-4' /> {certMsg}
         </div>
+      )}
+
+      {/* Final exam — unlocked once every video is completed */}
+      {!course.locked && course.progress.totalVideos > 0 && course.progress.completedVideos >= course.progress.totalVideos && (
+        <ExamGate courseId={course._id} onPassed={() => { setExamPassed(true); load() }} showExam={showExam} setShowExam={setShowExam} examPassed={examPassed} setCertMsg={setCertMsg} />
       )}
 
       {course.locked ? (
@@ -282,6 +290,134 @@ export default function KurslarPage() {
           <CourseCatalog onOpen={setOpenSlug} />
         )}
       </main>
+    </div>
+  )
+}
+
+/* ─── Final exam gate (button + modal) ─── */
+function ExamGate({ courseId, showExam, setShowExam, examPassed, setCertMsg, onPassed }: {
+  courseId: string
+  showExam: boolean
+  setShowExam: (v: boolean) => void
+  examPassed: boolean
+  setCertMsg: (v: string | null) => void
+  onPassed: () => void
+}) {
+  const { t } = useT()
+  const [exam, setExam] = useState<UserExam | null>(null)
+  const [questions, setQuestions] = useState<UserQuestion[]>([])
+  const [best, setBest] = useState<{ scorePercent: number; passed: boolean } | null>(null)
+  const [answers, setAnswers] = useState<Record<string, { selected: string[]; textAnswer: string }>>({})
+  const [result, setResult] = useState<ExamResult | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    api.exams.getForUser(courseId).then(d => {
+      setExam(d.exam); setQuestions(d.questions); setBest(d.best)
+    }).catch(() => {})
+  }, [courseId])
+
+  if (!exam) return null // no exam -> certificate flow handled by video completion
+
+  const alreadyPassed = examPassed || best?.passed
+
+  const ans = (qid: string) => answers[qid] ?? { selected: [], textAnswer: '' }
+  const setSel = (q: UserQuestion, optId: string) => {
+    setAnswers(a => {
+      const cur = ans(q._id)
+      if (q.type === 'multiple') {
+        const has = cur.selected.includes(optId)
+        return { ...a, [q._id]: { ...cur, selected: has ? cur.selected.filter(x => x !== optId) : [...cur.selected, optId] } }
+      }
+      return { ...a, [q._id]: { ...cur, selected: [optId] } }
+    })
+  }
+  const setText = (qid: string, v: string) => setAnswers(a => ({ ...a, [qid]: { ...ans(qid), textAnswer: v } }))
+
+  async function submit() {
+    setSubmitting(true)
+    try {
+      const payload = questions.map(q => ({ question: q._id, selected: ans(q._id).selected, textAnswer: ans(q._id).textAnswer }))
+      const res = await api.exams.submit(exam!._id, payload)
+      setResult(res.result)
+      if (res.result.passed) {
+        onPassed()
+        if (res.certificate) setCertMsg(`${t('exam.passed')} ${res.certificate.serial}`)
+      }
+    } catch { /* silent */ } finally { setSubmitting(false) }
+  }
+
+  return (
+    <div className='mb-5'>
+      <div className='flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/20'>
+        <div className='flex items-center gap-2 text-sm'>
+          <GraduationCap className='w-5 h-5 text-primary' />
+          <span className='font-medium text-text-primary'>{exam.title}</span>
+          {alreadyPassed
+            ? <span className='text-xs text-emerald-600 flex items-center gap-1'><CheckCircle2 className='w-3.5 h-3.5' /> {t('exam.passed')}</span>
+            : <span className='text-xs text-text-secondary'>{t('exam.examRequired')}</span>}
+        </div>
+        {!alreadyPassed && (
+          <button onClick={() => { setResult(null); setShowExam(true) }} className='px-4 py-2 rounded-xl text-sm font-medium bg-primary text-white shrink-0'>
+            {best ? t('exam.retake') : t('exam.startExam')}
+          </button>
+        )}
+      </div>
+
+      {/* Exam modal */}
+      {showExam && !alreadyPassed && (
+        <div className='fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto' onClick={() => setShowExam(false)}>
+          <div className='bg-surface border border-border rounded-2xl p-6 w-full max-w-2xl my-8' onClick={e => e.stopPropagation()}>
+            <div className='flex items-center justify-between mb-4'>
+              <h3 className='text-lg font-bold text-text-primary'>{exam.title}</h3>
+              <button onClick={() => setShowExam(false)} className='p-1.5 rounded-lg hover:bg-surface-light text-text-secondary'><XCircle className='w-5 h-5' /></button>
+            </div>
+
+            {result ? (
+              <div className='text-center py-6'>
+                {result.passed
+                  ? <CheckCircle2 className='w-14 h-14 text-emerald-500 mx-auto mb-3' />
+                  : <XCircle className='w-14 h-14 text-accent mx-auto mb-3' />}
+                <p className='text-xl font-bold text-text-primary'>{result.passed ? t('exam.passed') : t('exam.failed')}</p>
+                <p className='text-sm text-text-secondary mt-1'>{t('exam.yourScore')}: <b>{result.scorePercent}%</b> · {t('exam.passNeeded')}: {result.passingScore}%</p>
+                {result.earnedPoints > 0 && <p className='text-sm text-emerald-600 mt-1'>+{result.earnedPoints} {t('exam.earnedPoints').toLowerCase()}</p>}
+                <div className='flex gap-2 justify-center mt-5'>
+                  {!result.passed && <button onClick={() => { setResult(null); setAnswers({}) }} className='px-4 py-2 rounded-xl text-sm bg-primary text-white'>{t('exam.retake')}</button>}
+                  <button onClick={() => setShowExam(false)} className='px-4 py-2 rounded-xl text-sm bg-surface-light text-text-primary'>{t('cm.cancel') /* close */}</button>
+                </div>
+              </div>
+            ) : (
+              <div className='space-y-5'>
+                {questions.map((q, i) => (
+                  <div key={q._id}>
+                    <p className='text-sm font-medium text-text-primary mb-2'>{i + 1}. {q.text}</p>
+                    {q.type === 'short' ? (
+                      <input value={ans(q._id).textAnswer} onChange={e => setText(q._id, e.target.value)} placeholder={t('exam.yourAnswer')}
+                        className='w-full bg-surface-light border border-border rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/40' />
+                    ) : (
+                      <div className='space-y-1.5'>
+                        {q.options.map(o => {
+                          const selected = ans(q._id).selected.includes(o._id)
+                          return (
+                            <button key={o._id} type='button' onClick={() => setSel(q, o._id)}
+                              className={`flex items-center gap-2 w-full text-left px-3 py-2 rounded-xl text-sm border transition-colors ${selected ? 'border-primary bg-primary/10 text-text-primary' : 'border-border bg-surface-light text-text-secondary hover:border-primary/40'}`}>
+                              <span className={`w-4 h-4 ${q.type === 'multiple' ? 'rounded-md' : 'rounded-full'} border-2 shrink-0 ${selected ? 'border-primary bg-primary' : 'border-text-secondary/40'}`} />
+                              {o.text}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button onClick={submit} disabled={submitting} className='w-full px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-white disabled:opacity-50'>
+                  {submitting ? '...' : t('exam.submit')}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
