@@ -7,6 +7,77 @@ function isStaff(req: AuthRequest): boolean {
   return req.user?.role === 'admin' || req.user?.role === 'instructor'
 }
 
+// Ushbu hostlar CORS sarlavhalarini yubormaydi — brauzer PDF.js ularni
+// to'g'ridan-to'g'ri yuklay olmaydi. Same-origin proxy orqali (Range qo'llab)
+// uzatamiz. Faqat ushbu ishonchli tibbiy kutubxona hostlari ruxsat etilgan.
+const PROXY_ALLOWED_HOSTS = new Set(['api.unilibrary.uz', 'api.ziyonet.uz'])
+
+function parseAllowedPdfUrl(rawUrl: string): URL | null {
+  try {
+    const parsed = new URL(rawUrl)
+    if (parsed.protocol !== 'https:') return null
+    if (!PROXY_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) return null
+    if (!parsed.pathname.toLowerCase().endsWith('.pdf')) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+// GET /api/books/proxy?url=<https pdf>  — CORS yubormaydigan tashqi PDF'ni
+// same-origin orqali uzatadi (react-pdf reader uchun).
+export const proxyBookPdf = async (req: Request, res: Response): Promise<void> => {
+  const target = parseAllowedPdfUrl(String(req.query.url || ''))
+  if (!target) {
+    res.status(400).json({ message: 'Qo\'llab-quvvatlanmaydigan yoki noto\'g\'ri PDF manba' })
+    return
+  }
+
+  const upstreamHeaders: Record<string, string> = { Accept: 'application/pdf,*/*;q=0.8' }
+  const range = req.headers.range
+  if (range) upstreamHeaders.Range = range
+
+  let upstream: globalThis.Response
+  try {
+    upstream = await fetch(target.toString(), { headers: upstreamHeaders, redirect: 'follow' })
+  } catch {
+    res.status(502).json({ message: 'Tashqi PDF yuklab bo\'lmadi' })
+    return
+  }
+
+  if (!upstream.ok && upstream.status !== 206) {
+    res.status(502).json({ message: 'Tashqi PDF mavjud emas' })
+    return
+  }
+  const contentType = (upstream.headers.get('content-type') || '').toLowerCase()
+  if (!contentType.includes('application/pdf')) {
+    res.status(415).json({ message: 'Manba PDF emas' })
+    return
+  }
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Cache-Control', 'private, max-age=0, no-store')
+  for (const h of ['content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag']) {
+    const v = upstream.headers.get(h)
+    if (v) res.setHeader(h, v)
+  }
+  res.status(upstream.status)
+
+  if (!upstream.body) { res.end(); return }
+  const reader = upstream.body.getReader()
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      res.write(Buffer.from(value))
+    }
+    res.end()
+  } catch {
+    res.end()
+  }
+}
+
 function applyFields(doc: object, body: Record<string, unknown>, fields: string[]): void {
   const target = doc as unknown as Record<string, unknown>
   for (const f of fields) {

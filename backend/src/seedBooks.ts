@@ -1,4 +1,5 @@
 import './loadEnv'
+import fs from 'fs'
 import path from 'path'
 import { pathToFileURL } from 'url'
 import mongoose from 'mongoose'
@@ -27,9 +28,11 @@ interface LegacyBook {
   sources: { type: string; label: string; url: string; embedUrl?: string }[]
 }
 
-async function loadLegacyBooks(): Promise<LegacyBook[]> {
-  // frontend/lib/library-data.ts is plain TS with no runtime deps — tsx can import it.
+async function loadLegacyBooks(): Promise<LegacyBook[] | null> {
+  // Legacy manba (frontend/lib/library-data.ts) bir martalik migratsiyadan keyin
+  // o'chirilgan. Fayl yo'q bo'lsa — migratsiya allaqachon bajarilgan, null qaytaramiz.
   const file = path.resolve(__dirname, '..', '..', 'frontend', 'lib', 'library-data.ts')
+  if (!fs.existsSync(file)) return null
   const mod = await import(pathToFileURL(file).href)
   return (mod.BOOKS ?? []) as LegacyBook[]
 }
@@ -41,6 +44,12 @@ async function main() {
   console.log('MongoDB ulandi')
 
   const legacy = await loadLegacyBooks()
+  if (legacy === null) {
+    const total = await Book.countDocuments({})
+    console.log(`Legacy manba o'chirilgan — migratsiya allaqachon bajarilgan. Jami Book: ${total}`)
+    await mongoose.disconnect()
+    return
+  }
   console.log(`Legacy kitoblar: ${legacy.length}`)
 
   // Attribute seeded books to an admin if one exists.

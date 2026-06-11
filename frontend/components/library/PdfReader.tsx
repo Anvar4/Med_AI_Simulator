@@ -31,15 +31,16 @@ const SCALE_STEP = 0.2
 type FitMode = 'width' | 'page' | 'custom'
 
 // Ushbu hostlar CORS sarlavhalarini yubormaydi — react-pdf ularni brauzerda
-// to'g'ridan-to'g'ri yuklay olmaydi, shuning uchun same-origin proxy orqali
-// (app/api/library/proxy) uzatamiz. Proxy ham xuddi shu allow-list'ga ega.
+// to'g'ridan-to'g'ri yuklay olmaydi, shuning uchun backend proxy orqali
+// (/api/books/proxy) uzatamiz. Backend ham xuddi shu allow-list'ga ega.
 const PROXY_HOSTS = new Set(['api.unilibrary.uz', 'api.ziyonet.uz'])
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
 
 function resolveReaderSrc(src: string): string {
   try {
     const u = new URL(src, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
     if (PROXY_HOSTS.has(u.hostname.toLowerCase())) {
-      return `/api/library/proxy?url=${encodeURIComponent(src)}`
+      return `${API_URL}/books/proxy?url=${encodeURIComponent(src)}`
     }
   } catch {
     /* nisbiy yoki noto'g'ri URL — o'zgartirmaymiz */
