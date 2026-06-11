@@ -544,6 +544,40 @@ export const api = {
       }),
   },
 
+  // ─── Library (books — DB-driven, PDF.js reader) ─────────────
+  books: {
+    // Public (viewer-aware)
+    list: (params: BookListParams = {}) => {
+      const qs = new URLSearchParams()
+      if (params.category) qs.set('category', params.category)
+      if (params.language) qs.set('language', params.language)
+      if (params.search) qs.set('search', params.search)
+      if (params.featured) qs.set('featured', 'true')
+      if (params.page) qs.set('page', String(params.page))
+      if (params.limit) qs.set('limit', String(params.limit))
+      const suffix = qs.toString() ? `?${qs.toString()}` : ''
+      return request<{ status: string } & BookListResult>(`/books${suffix}`)
+    },
+    categories: () =>
+      request<{ status: string; categories: BookCategory[] }>('/books/categories'),
+    get: (id: string) =>
+      request<{ status: string; book: Book }>(`/books/${id}`),
+
+    // CM / admin
+    adminList: () =>
+      request<{ status: string; books: Book[] }>('/books/admin/mine'),
+    create: (data: BookInput) =>
+      request<{ status: string; book: Book }>('/books', {
+        method: 'POST', body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<BookInput>) =>
+      request<{ status: string; book: Book }>(`/books/${id}`, {
+        method: 'PATCH', body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ status: string; message: string }>(`/books/${id}`, { method: 'DELETE' }),
+  },
+
   // ─── Speech-to-Text (voice input) ──────────────────────────
   stt: {
     transcribe: async (audio: Blob, language: 'uz' | 'ru' | 'en' = 'uz'): Promise<{ status: string; text: string }> => {
@@ -908,6 +942,66 @@ export interface ExamAnswerInput {
   question: string
   selected?: string[]
   textAnswer?: string
+}
+
+export type BookLanguage = 'uz' | 'ru' | 'en'
+
+export interface Book {
+  _id: string
+  title: string
+  author: string
+  description: string
+  category: string
+  language: BookLanguage
+  year?: number
+  pages?: number
+  coverImage?: string
+  tags: string[]
+  fileUrl: string
+  sourceType: 'upload' | 'external'
+  isPublished: boolean
+  isFeatured: boolean
+  views: number
+  createdBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface BookInput {
+  title: string
+  author?: string
+  description?: string
+  category?: string
+  language?: BookLanguage
+  year?: number
+  pages?: number
+  coverImage?: string
+  tags?: string[]
+  fileUrl: string
+  sourceType?: 'upload' | 'external'
+  isPublished?: boolean
+  isFeatured?: boolean
+}
+
+export interface BookListParams {
+  category?: string
+  language?: BookLanguage
+  search?: string
+  featured?: boolean
+  page?: number
+  limit?: number
+}
+
+export interface BookListResult {
+  books: Book[]
+  total: number
+  totalPages: number
+  currentPage: number
+}
+
+export interface BookCategory {
+  name: string
+  count: number
 }
 
 export interface UserSubscription {

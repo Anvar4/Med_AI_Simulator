@@ -4,6 +4,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import CMCourses from '@/components/content-manager/CMCourses';
 import CMDashboard from '@/components/content-manager/CMDashboard';
+import CMLibrary from '@/components/content-manager/CMLibrary';
 import CMPlaceholder from '@/components/content-manager/CMPlaceholder';
 import CMTabBar, { CMTab } from '@/components/content-manager/CMTabBar';
 import Badge from '@/components/ui/Badge';
@@ -17,7 +18,6 @@ import { useToast } from '@/lib/toast-context';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     AlertCircle,
-    BookOpen,
     CheckCircle,
     Clock,
     Edit3,
@@ -969,7 +969,7 @@ export default function ContentManagerPage() {
 
 						{cmTab === 'dashboard' && <CMDashboard />}
 						{cmTab === 'emergency' && <CMPlaceholder icon={AlertCircle} titleKey='cm.emergency' />}
-						{cmTab === 'library' && <CMPlaceholder icon={BookOpen} titleKey='cm.library' />}
+						{cmTab === 'library' && <CMLibrary />}
 						{cmTab === 'exams' && <CMPlaceholder icon={FileQuestion} titleKey='cm.exams' />}
 						{cmTab === 'analytics' && <CMDashboard />}
 

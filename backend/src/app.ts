@@ -12,6 +12,7 @@ import adminRoutes from './routes/admin';
 import attemptRoutes from './routes/attempts';
 import authRoutes from './routes/auth';
 import balanceRoutes from './routes/balance';
+import bookRoutes from './routes/books';
 import caseRoutes from './routes/cases';
 import chatRoutes from './routes/chat';
 import courseRoutes from './routes/courses';
@@ -113,6 +114,7 @@ app.use('/api/stt', sttRoutes)
 app.use('/api/upload', uploadRoutes)
 app.use('/api/chat', chatRoutes)
 app.use('/api/courses', courseRoutes)
+app.use('/api/books', bookRoutes)
 app.use('/api/learning', learningRoutes)
 app.use('/api/payments', paymentRoutes)
 app.use('/api/referrals', referralRoutes)
