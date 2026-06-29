@@ -26,7 +26,7 @@ const CSP_DIRECTIVES = [
     isDev ? 'ws://localhost:* http://localhost:*' : '',
   ].filter(Boolean).join(' '),
   "worker-src 'self' blob:",
-  "frame-src 'none'",
+  "frame-src https://accounts.google.com",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",
