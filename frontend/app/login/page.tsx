@@ -65,6 +65,7 @@ try {
 }
 
 const googleLoginPopup = useGoogleLogin({
+flow: 'implicit',
 onSuccess: async tokenResponse => {
   setIsGoogleLoading(true)
   setError('')
@@ -78,11 +79,33 @@ onSuccess: async tokenResponse => {
     setIsGoogleLoading(false)
   }
 },
-onError: () => {
-  setError('Google orqali kirishda xatolik yuz berdi')
+onError: errorResponse => {
+  console.error('[GoogleLogin] onError:', errorResponse)
+  setError(`Google xatosi: ${errorResponse?.error_description || errorResponse?.error || 'noma\'lum'}`)
+  setIsGoogleLoading(false)
+},
+onNonOAuthError: nonOAuthErr => {
+  // popup yopildi / blokeri / FedCM rad etdi
+  console.error('[GoogleLogin] onNonOAuthError:', nonOAuthErr)
+  setError(`Popup ochilmadi (${nonOAuthErr?.type || 'noma\'lum'}). Popup blokerini o'chiring yoki uchinchi tomon cookie\'larini yoqing.`)
   setIsGoogleLoading(false)
 },
 })
+
+const handleGooglePopupClick = () => {
+const cid = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+console.log('[GoogleLogin] clientId mavjud:', !!cid, cid ? cid.slice(0, 20) + '…' : '(BO\'SH!)')
+if (!cid) {
+  setError('Google clientId topilmadi (build env muammosi)')
+  return
+}
+try {
+  googleLoginPopup()
+} catch (e) {
+  console.error('[GoogleLogin] popup chaqirishda exception:', e)
+  setError('Google popup chaqirilmadi: ' + (e instanceof Error ? e.message : String(e)))
+}
+}
 
 if (isLoading || user) {
 return <div className='min-h-screen bg-secondary flex items-center justify-center'><div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' /></div>
@@ -154,7 +177,7 @@ className='w-full max-w-md'
 <div className={`[&>div]:w-full [&>div>div]:w-full [&_iframe]:w-full ${isGoogleLoading ? 'opacity-60 pointer-events-none' : ''}`}>
   <GoogleLogin
     onSuccess={handleGoogleSuccess}
-    onError={() => googleLoginPopup()}
+    onError={() => handleGooglePopupClick()}
     width='400'
     size='large'
     shape='rectangular'
@@ -165,7 +188,7 @@ className='w-full max-w-md'
 </div>
 <button
   type='button'
-  onClick={() => googleLoginPopup()}
+  onClick={handleGooglePopupClick}
   disabled={isGoogleLoading || isSubmitting}
   className='w-full mt-2 flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2.5 px-4 rounded-xl border border-gray-200 transition-all disabled:opacity-60'
 >
