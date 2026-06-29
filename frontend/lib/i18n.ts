@@ -169,6 +169,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'exam.false': "Noto'g'ri",
     'exam.yourAnswer': 'Javobingiz',
 
+    // Certificate (kurslar sahifasi)
+    'cert.issuedTitle': 'Tabriklaymiz! Sertifikat berildi',
+    'cert.serial': 'Seriya',
+    'cert.downloadPdf': 'PDF yuklab olish',
+    'cert.verifyLink': 'Tekshirish sahifasi',
+
+    // Certificate verification (public /verify/:serial)
+    'verify.home': 'Bosh sahifa',
+    'verify.title': 'Sertifikatni tekshirish',
+    'verify.subtitle': 'MedAI Simulator — tibbiy ta\'lim platformasi',
+    'verify.checking': 'Tekshirilmoqda...',
+    'verify.valid': 'Sertifikat haqiqiy',
+    'verify.validDesc': 'Ushbu sertifikat platforma tomonidan berilgan',
+    'verify.invalid': 'Sertifikat topilmadi',
+    'verify.invalidDesc': 'Bunday seriya raqamli sertifikat mavjud emas yoki bekor qilingan.',
+    'verify.recipient': 'Sertifikat egasi',
+    'verify.course': 'Kurs',
+    'verify.issuedAt': 'Berilgan sana',
+    'verify.serial': 'Seriya raqami',
+    'verify.downloadPdf': 'PDF yuklab olish',
+    'verify.footer': 'Ushbu sahifa sertifikat haqiqiyligini tasdiqlaydi. Seriya raqami noyob va o\'zgartirib bo\'lmaydi.',
+
     // Dashboard
     'dashboard.welcome': 'Xush kelibsiz! 👋',
     'dashboard.subtitle': 'Bugungi mashg\'ulotingizni davom eting',
@@ -663,6 +685,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'exam.false': 'False',
     'exam.yourAnswer': 'Your answer',
 
+    // Certificate (courses page)
+    'cert.issuedTitle': 'Congratulations! Certificate issued',
+    'cert.serial': 'Serial',
+    'cert.downloadPdf': 'Download PDF',
+    'cert.verifyLink': 'Verification page',
+
+    // Certificate verification (public /verify/:serial)
+    'verify.home': 'Home',
+    'verify.title': 'Certificate verification',
+    'verify.subtitle': 'MedAI Simulator — medical education platform',
+    'verify.checking': 'Verifying...',
+    'verify.valid': 'Certificate is valid',
+    'verify.validDesc': 'This certificate was issued by the platform',
+    'verify.invalid': 'Certificate not found',
+    'verify.invalidDesc': 'No certificate with this serial exists or it has been revoked.',
+    'verify.recipient': 'Recipient',
+    'verify.course': 'Course',
+    'verify.issuedAt': 'Issued on',
+    'verify.serial': 'Serial number',
+    'verify.downloadPdf': 'Download PDF',
+    'verify.footer': 'This page confirms the certificate\'s authenticity. The serial number is unique and tamper-proof.',
+
     // Dashboard
     'dashboard.welcome': 'Welcome! 👋',
     'dashboard.subtitle': 'Continue your today\'s practice',
@@ -1156,6 +1200,28 @@ const translations: Record<Locale, Record<string, string>> = {
     'exam.true': 'Верно',
     'exam.false': 'Неверно',
     'exam.yourAnswer': 'Ваш ответ',
+
+    // Certificate (страница курсов)
+    'cert.issuedTitle': 'Поздравляем! Сертификат выдан',
+    'cert.serial': 'Серия',
+    'cert.downloadPdf': 'Скачать PDF',
+    'cert.verifyLink': 'Страница проверки',
+
+    // Certificate verification (public /verify/:serial)
+    'verify.home': 'Главная',
+    'verify.title': 'Проверка сертификата',
+    'verify.subtitle': 'MedAI Simulator — платформа медицинского образования',
+    'verify.checking': 'Проверка...',
+    'verify.valid': 'Сертификат действителен',
+    'verify.validDesc': 'Этот сертификат выдан платформой',
+    'verify.invalid': 'Сертификат не найден',
+    'verify.invalidDesc': 'Сертификат с таким серийным номером не существует или был отозван.',
+    'verify.recipient': 'Владелец',
+    'verify.course': 'Курс',
+    'verify.issuedAt': 'Дата выдачи',
+    'verify.serial': 'Серийный номер',
+    'verify.downloadPdf': 'Скачать PDF',
+    'verify.footer': 'Эта страница подтверждает подлинность сертификата. Серийный номер уникален и защищён от подделки.',
 
     // Dashboard
     'dashboard.welcome': 'Добро пожаловать! 👋',

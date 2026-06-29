@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync('dist/assets',{recursive:true});if(fs.existsSync('src/assets/logo.png'))fs.copyFileSync('src/assets/logo.png','dist/assets/logo.png')\"",
     "start": "node dist/server.js",
     "test": "tsx --test src/**/*.test.ts",
     "seed": "tsx src/seed.ts",
@@ -16,7 +16,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1061.0",
     "@types/nodemailer": "^7.0.11",
+    "@types/qrcode": "^1.5.6",
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -29,10 +31,13 @@
     "multer": "^2.1.1",
     "node-telegram-bot-api": "^0.67.0",
     "nodemailer": "^8.0.4",
-    "openai": "^6.33.0"
+    "openai": "^6.33.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",

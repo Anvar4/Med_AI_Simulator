@@ -7,6 +7,7 @@ import { ExamAttempt } from '../models/ExamAttempt'
 import { notify } from '../models/Notification'
 import { Video } from '../models/Video'
 import { VideoProgress } from '../models/VideoProgress'
+import { generateCertificatePdf } from '../services/certificateService'
 
 // Motivational milestones (course completion %). When a user crosses one of
 // these by completing a video, they get an in-app notification.
@@ -227,6 +228,40 @@ export const verifyCertificate = async (req: Request, res: Response): Promise<vo
         issuedAt: cert.issuedAt,
       },
     })
+  } catch (error) {
+    res.status(500).json({ message: 'Server xatosi', error })
+  }
+}
+
+// ─── Certificate PDF (public, by serial) ───────────────────────
+// GET /api/courses/certificates/:serial/pdf
+// Public: the serial is the shareable token; anyone with it (employer, etc.)
+// may download the verifiable PDF. The QR inside links to the verify page.
+export const downloadCertificatePdf = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const cert = await Certificate.findOne({ serial: req.params.serial })
+    if (!cert) {
+      res.status(404).json({ message: 'Sertifikat topilmadi' })
+      return
+    }
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '')
+    const verifyUrl = `${frontendUrl}/verify/${encodeURIComponent(cert.serial)}`
+
+    const pdfBytes = await generateCertificatePdf(
+      {
+        serial: cert.serial,
+        recipientName: cert.recipientName,
+        courseTitle: cert.courseTitle,
+        issuedAt: cert.issuedAt,
+      },
+      verifyUrl
+    )
+
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="MedAI-Sertifikat-${cert.serial}.pdf"`)
+    res.setHeader('Cache-Control', 'private, max-age=0, no-store')
+    res.status(200).end(Buffer.from(pdfBytes))
   } catch (error) {
     res.status(500).json({ message: 'Server xatosi', error })
   }

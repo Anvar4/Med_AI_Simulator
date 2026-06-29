@@ -19,7 +19,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
-const { login, loginWithData, user } = useAuth()
+const { login, loginWithData, user, isLoading } = useAuth()
 const { t } = useT()
 const router = useRouter()
 const [username, setUsername] = useState('')
@@ -30,12 +30,12 @@ const [isSubmitting, setIsSubmitting] = useState(false)
 const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
 useEffect(() => {
-if (user) {
+if (!isLoading && user) {
 if (user.role === 'admin') router.push('/admin')
 else if (user.role === 'content-manager') router.push('/content-manager')
 else router.push('/dashboard')
 }
-}, [user, router])
+}, [user, isLoading, router])
 
 const handleSubmit = async (e: React.FormEvent) => {
 e.preventDefault()
@@ -52,7 +52,7 @@ setIsGoogleLoading(true)
 setError('')
 try {
 const res = await api.auth.googleAccessToken(tokenResponse.access_token)
-loginWithData(backendUserToAuth(res.user, res.token))
+loginWithData(backendUserToAuth(res.user, res.token), res.token)
 } catch (err) {
 const msg = err instanceof Error ? err.message : 'Google orqali kirishda xatolik'
 setError(msg)
@@ -65,6 +65,10 @@ setError('Google orqali kirishda xatolik yuz berdi')
 setIsGoogleLoading(false)
 },
 })
+
+if (isLoading || user) {
+return <div className='min-h-screen bg-secondary flex items-center justify-center'><div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' /></div>
+}
 
 return (
 <div className='min-h-screen bg-secondary flex relative'>

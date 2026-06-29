@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 type Step = 'email' | 'otp' | 'reset'
 
 export default function ForgotPasswordPage() {
-	const { loginWithData, user } = useAuth()
+	const { loginWithData, user, isLoading: authLoading } = useAuth()
 	const router = useRouter()
 
 	const [step, setStep] = useState<Step>('email')
@@ -30,8 +30,8 @@ export default function ForgotPasswordPage() {
 	const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
 	useEffect(() => {
-		if (user) router.push('/dashboard')
-	}, [user, router])
+		if (!authLoading && user) router.push('/dashboard')
+	}, [user, authLoading, router])
 
 	useEffect(() => {
 		if (resendCooldown > 0) {
@@ -99,12 +99,16 @@ export default function ForgotPasswordPage() {
 		setIsLoading(true)
 		try {
 			const res = await api.auth.resetPassword(tempToken, newUsername, newPassword)
-			loginWithData(backendUserToAuth(res.user, res.token))
+			loginWithData(backendUserToAuth(res.user, res.token), res.token)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Xatolikni yangilashda xatolik')
 		} finally {
 			setIsLoading(false)
 		}
+	}
+
+	if (authLoading || user) {
+		return <div className='min-h-screen bg-secondary flex items-center justify-center'><div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' /></div>
 	}
 
 	return (

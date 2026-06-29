@@ -1,31 +1,78 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-const STORAGE_KEY = 'med-ai-auth'
-const AUTH_CHANGE_EVENT = 'med-ai-auth-changed'
+// ─── Token store (in-memory only — never touches localStorage) ────────────────
+// Access token lives here. On page reload it is empty; the AuthProvider
+// calls refresh() immediately on mount to restore a session from the
+// HttpOnly refresh-token cookie.
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null
-  const raw = localStorage.getItem('med-ai-auth')
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed.token || null
-  } catch {
-    return null
-  }
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+
+let _accessToken: string | null = null
+let _refreshPromise: Promise<string | null> | null = null
+
+export const tokenStore = {
+  get(): string | null {
+    return _accessToken
+  },
+  set(token: string | null): void {
+    _accessToken = token
+  },
+  clear(): void {
+    _accessToken = null
+  },
 }
+
+// ─── Refresh token (singleton — prevents concurrent refresh storms) ───────────
+
+export async function refreshAccessToken(): Promise<string | null> {
+  // Return the in-flight promise so concurrent callers share one network request.
+  if (_refreshPromise) return _refreshPromise
+
+  _refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        tokenStore.clear()
+        return null
+      }
+      const data = await res.json() as { token?: string }
+      const token = data.token ?? null
+      tokenStore.set(token)
+      return token
+    } catch {
+      tokenStore.clear()
+      return null
+    } finally {
+      // Always release the singleton so the next call starts a fresh request.
+      _refreshPromise = null
+    }
+  })()
+
+  return _refreshPromise
+}
+
+// ─── Core request helper ──────────────────────────────────────────────────────
 
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  _retry = false,
 ): Promise<T> {
-  const token = getToken()
+  const token = tokenStore.get()
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers })
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include', // always send cookies (refresh token, CSRF)
+  })
 
   let data: unknown = null
   try {
@@ -34,30 +81,54 @@ async function request<T>(
     data = null
   }
 
-  if (!res.ok) {
-    const message =
-      typeof data === 'object' && data !== null && 'message' in data
-        ? String((data as { message?: unknown }).message ?? '')
-        : ''
+  if (res.ok) return data as T
 
-    // Auto-reset stale sessions for protected endpoints.
-    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
-      localStorage.removeItem(STORAGE_KEY)
-      window.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
+  const message =
+    typeof data === 'object' && data !== null && 'message' in data
+      ? String((data as { message?: unknown }).message ?? '')
+      : ''
+  const code =
+    typeof data === 'object' && data !== null && 'code' in data
+      ? String((data as { code?: unknown }).code ?? '')
+      : ''
 
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login?reason=session-expired'
-      }
-
-      throw new Error('Sessiya muddati tugagan. Qayta tizimga kiring.')
+  // ── 401: attempt one transparent refresh then retry ───────────────────────
+  if (res.status === 401 && !_retry && !path.startsWith('/auth/')) {
+    // TOKEN_EXPIRED means the access token is stale but refresh cookie may be valid.
+    // For any other 401 we also try once (covers cold-start after page reload).
+    const newToken = await refreshAccessToken()
+    if (newToken) {
+      return request<T>(path, options, true)
     }
 
-    throw new Error(message || 'Server xatosi')
+    // Refresh also failed — session is dead
+    if (typeof window !== 'undefined') {
+      dispatchSessionExpired()
+    }
+    throw new Error('Sessiya muddati tugagan. Qayta tizimga kiring.')
   }
-  return data as T
+
+  // Rethrow with the code attached so callers can distinguish TOKEN_EXPIRED
+  const err = new Error(message || 'Server xatosi') as Error & { code?: string; status?: number }
+  err.code = code
+  err.status = res.status
+  throw err
 }
 
-// ─── Auth API ─────────────────────────────────────────────────
+// ─── Session-expired event (read by AuthProvider) ────────────────────────────
+
+const SESSION_EXPIRED_EVENT = 'med-ai-session-expired'
+
+export function dispatchSessionExpired(): void {
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+}
+
+export function onSessionExpired(cb: () => void): () => void {
+  window.addEventListener(SESSION_EXPIRED_EVENT, cb)
+  return () => window.removeEventListener(SESSION_EXPIRED_EVENT, cb)
+}
+
+// ─── Auth API ─────────────────────────────────────────────────────────────────
 
 export const api = {
   auth: {
@@ -66,6 +137,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       }),
+
+    logout: () =>
+      fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(tokenStore.get() ? { Authorization: `Bearer ${tokenStore.get()}` } : {}),
+        },
+      }).catch(() => null), // best-effort; never block UI logout
+
+    refresh: refreshAccessToken,
 
     google: (credential: string) =>
       request<{ token: string; user: BackendUser }>('/auth/google', {
@@ -91,7 +174,15 @@ export const api = {
         body: JSON.stringify({ email, code, type }),
       }),
 
-    completeRegister: (tempToken: string, firstName: string, lastName: string, username: string, password: string, avatar?: string, referralCode?: string) =>
+    completeRegister: (
+      tempToken: string,
+      firstName: string,
+      lastName: string,
+      username: string,
+      password: string,
+      avatar?: string,
+      referralCode?: string,
+    ) =>
       request<{ token: string; user: BackendUser }>('/auth/complete-register', {
         method: 'POST',
         body: JSON.stringify({ tempToken, firstName, lastName, username, password, avatar, referralCode }),
@@ -141,6 +232,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ code }),
       }),
+
     requestUsernameChange: (newUsername: string) =>
       request<{ message: string }>('/auth/request-username-change', {
         method: 'POST',
@@ -177,7 +269,6 @@ export const api = {
     getSystemStats: () =>
       request<{ status: string; stats: AdminStats }>('/admin/stats'),
 
-    // Content Manager dashboard (admin + instructor)
     getCMDashboard: () =>
       request<{ status: string; dashboard: CMDashboardStats }>('/admin/cm-dashboard'),
 
@@ -233,7 +324,7 @@ export const api = {
     },
 
     exportPromoCodesUrl: (type?: string) => {
-      const token = getToken()
+      const token = tokenStore.get()
       const q = new URLSearchParams()
       if (type) q.set('type', type)
       return `${API_URL}/admin/promo-codes/export?${q}&token=${token || ''}`
@@ -272,9 +363,9 @@ export const api = {
     getReferrals: () =>
       request<{ status: string; referrals: ReferralAnalytics }>('/admin/referrals'),
 
-    // Support tickets (from the Telegram support bot)
     getSupportStats: () =>
       request<{ status: string; stats: SupportStats }>('/admin/support/stats'),
+
     getSupportTickets: (params?: { status?: string; page?: number }) => {
       const qs = new URLSearchParams()
       if (params?.status) qs.set('status', params.status)
@@ -282,24 +373,31 @@ export const api = {
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
       return request<{ status: string; total: number; totalPages: number; currentPage: number; tickets: SupportTicket[] }>(`/admin/support/tickets${suffix}`)
     },
+
     updateTicketStatus: (id: string, status: 'open' | 'in_progress' | 'resolved') =>
-      request<{ status: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+      request<{ status: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+
     replyToTicket: (id: string, text: string) =>
-      request<{ status: string; delivered: boolean; message: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}/reply`, { method: 'POST', body: JSON.stringify({ text }) }),
+      request<{ status: string; delivered: boolean; message: string; ticket: SupportTicket }>(`/admin/support/tickets/${id}/reply`, {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      }),
+
     deleteTicket: (id: string) =>
       request<{ status: string; message: string }>(`/admin/support/tickets/${id}`, { method: 'DELETE' }),
+
     getTicketAttachment: (id: string, index: number) =>
       request<{ status: string; url: string; type: 'photo' | 'document'; fileName?: string }>(`/admin/support/tickets/${id}/attachment/${index}`),
 
-    // Payment requests (manual confirmation)
     getPayments: (params?: { status?: string; page?: number }) => {
       const qs = new URLSearchParams()
       if (params?.status) qs.set('status', params.status)
       if (params?.page) qs.set('page', String(params.page))
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
-      return request<{ status: string; total: number; totalPages: number; requests: PaymentRequestRow[] }>(
-        `/admin/payments${suffix}`
-      )
+      return request<{ status: string; total: number; totalPages: number; requests: PaymentRequestRow[] }>(`/admin/payments${suffix}`)
     },
 
     confirmPayment: (id: string, note?: string) =>
@@ -411,7 +509,7 @@ export const api = {
       }),
   },
 
-  // ─── TTS (Aisha Text-to-Speech) ─────────────────────────────
+  // ─── TTS ─────────────────────────────────────────────────────
   tts: {
     speak: (text: string, model?: 'gulnoza' | 'jaxongir') =>
       request<{ audioUrl: string }>('/tts', {
@@ -420,7 +518,7 @@ export const api = {
       }),
   },
 
-  // ─── Chat ────────────────────────────────────────────────────
+  // ─── Chat ─────────────────────────────────────────────────────
   chat: {
     send: (messages: { role: 'user' | 'assistant'; content: string }[]) =>
       request<{ status: string; reply: string }>('/chat', {
@@ -435,7 +533,7 @@ export const api = {
       }),
   },
 
-  // ─── Courses (DB-driven video courses) ──────────────────────
+  // ─── Courses ──────────────────────────────────────────────────
   courses: {
     list: (params: { category?: string; search?: string; level?: string; page?: number; mine?: boolean } = {}) => {
       const qs = new URLSearchParams()
@@ -445,9 +543,7 @@ export const api = {
       if (params.page) qs.set('page', String(params.page))
       if (params.mine) qs.set('mine', 'true')
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
-      return request<{ status: string; total: number; totalPages: number; currentPage: number; courses: CourseSummary[] }>(
-        `/courses${suffix}`
-      )
+      return request<{ status: string; total: number; totalPages: number; currentPage: number; courses: CourseSummary[] }>(`/courses${suffix}`)
     },
 
     categories: () =>
@@ -459,7 +555,7 @@ export const api = {
     saveProgress: (videoId: string, positionSeconds: number, completed?: boolean) =>
       request<{ status: string; progress: unknown; certificate: CourseCertificate | null }>(
         `/courses/videos/${videoId}/progress`,
-        { method: 'POST', body: JSON.stringify({ positionSeconds, completed }) }
+        { method: 'POST', body: JSON.stringify({ positionSeconds, completed }) },
       ),
 
     myCertificates: () =>
@@ -467,86 +563,108 @@ export const api = {
 
     verifyCertificate: (serial: string) =>
       request<{ status: string; valid: boolean; certificate?: { serial: string; recipientName: string; courseTitle: string; issuedAt: string } }>(
-        `/courses/certificates/verify/${encodeURIComponent(serial)}`
+        `/courses/certificates/verify/${encodeURIComponent(serial)}`,
       ),
 
-    // ── Course management (CM / admin) ──
+    certificatePdfUrl: (serial: string) =>
+      `${API_URL}/courses/certificates/${encodeURIComponent(serial)}/pdf`,
+
     createCourse: (data: CourseInput) =>
       request<{ status: string; course: CourseSummary }>('/courses', {
-        method: 'POST', body: JSON.stringify(data),
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
+
     updateCourse: (id: string, data: Partial<CourseInput & { isPublished: boolean }>) =>
       request<{ status: string; course: CourseSummary }>(`/courses/${id}`, {
-        method: 'PATCH', body: JSON.stringify(data),
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
+
     deleteCourse: (id: string) =>
       request<{ status: string; message: string }>(`/courses/${id}`, { method: 'DELETE' }),
 
     createPlaylist: (courseId: string, data: { title: string; description?: string; order?: number }) =>
       request<{ status: string; playlist: CoursePlaylist }>(`/courses/${courseId}/playlists`, {
-        method: 'POST', body: JSON.stringify(data),
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
+
     updatePlaylist: (id: string, data: { title?: string; description?: string; order?: number; isPublished?: boolean }) =>
       request<{ status: string; playlist: CoursePlaylist }>(`/courses/playlists/${id}`, {
-        method: 'PATCH', body: JSON.stringify(data),
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
+
     deletePlaylist: (id: string) =>
       request<{ status: string; message: string }>(`/courses/playlists/${id}`, { method: 'DELETE' }),
 
     createVideo: (playlistId: string, data: { title: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/playlists/${playlistId}/videos`, {
-        method: 'POST', body: JSON.stringify(data),
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
+
     updateVideo: (id: string, data: { title?: string; source?: 'youtube' | 'upload'; url?: string; videoUrl?: string; description?: string; durationSeconds?: number; order?: number; isPublished?: boolean }) =>
       request<{ status: string; video: CourseVideo }>(`/courses/videos/${id}`, {
-        method: 'PATCH', body: JSON.stringify(data),
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
+
     deleteVideo: (id: string) =>
       request<{ status: string; message: string }>(`/courses/videos/${id}`, { method: 'DELETE' }),
 
-    // Drag & drop reorder (CM / admin)
     reorderVideos: (playlistId: string, videoIds: string[]) =>
       request<{ status: string; count: number }>(`/courses/playlists/${playlistId}/reorder`, {
-        method: 'PATCH', body: JSON.stringify({ videoIds }),
+        method: 'PATCH',
+        body: JSON.stringify({ videoIds }),
       }),
+
     reorderPlaylists: (courseId: string, playlistIds: string[]) =>
       request<{ status: string; count: number }>(`/courses/${courseId}/playlists/reorder`, {
-        method: 'PATCH', body: JSON.stringify({ playlistIds }),
+        method: 'PATCH',
+        body: JSON.stringify({ playlistIds }),
       }),
   },
 
-  // ─── Exams (course final exam) ─────────────────────────────
+  // ─── Exams ────────────────────────────────────────────────────
   exams: {
-    // CM / admin
     getAdmin: (courseId: string) =>
       request<{ status: string; exam: ExamSettings | null; questions: AdminQuestion[] }>(`/courses/${courseId}/exam-admin`),
+
     upsert: (courseId: string, data: Partial<Pick<ExamSettings, 'title' | 'description' | 'passingScore' | 'rewardPoints' | 'isPublished'>>) =>
       request<{ status: string; exam: ExamSettings }>(`/courses/${courseId}/exam-admin`, {
-        method: 'PUT', body: JSON.stringify(data),
+        method: 'PUT',
+        body: JSON.stringify(data),
       }),
+
     createQuestion: (courseId: string, data: QuestionInput) =>
       request<{ status: string; question: AdminQuestion }>(`/courses/${courseId}/exam-admin/questions`, {
-        method: 'POST', body: JSON.stringify(data),
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
+
     updateQuestion: (id: string, data: QuestionInput) =>
       request<{ status: string; question: AdminQuestion }>(`/courses/exam-questions/${id}`, {
-        method: 'PATCH', body: JSON.stringify(data),
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
+
     deleteQuestion: (id: string) =>
       request<{ status: string; message: string }>(`/courses/exam-questions/${id}`, { method: 'DELETE' }),
 
-    // User
     getForUser: (courseId: string) =>
       request<{ status: string; exam: UserExam | null; questions: UserQuestion[]; best: { scorePercent: number; passed: boolean } | null }>(`/courses/${courseId}/exam`),
+
     submit: (examId: string, answers: ExamAnswerInput[]) =>
       request<{ status: string; result: ExamResult; certificate: CourseCertificate | null }>(`/courses/exams/${examId}/submit`, {
-        method: 'POST', body: JSON.stringify({ answers }),
+        method: 'POST',
+        body: JSON.stringify({ answers }),
       }),
   },
 
-  // ─── Library (books — DB-driven, PDF.js reader) ─────────────
+  // ─── Library ──────────────────────────────────────────────────
   books: {
-    // Public (viewer-aware)
     list: (params: BookListParams = {}) => {
       const qs = new URLSearchParams()
       if (params.category) qs.set('category', params.category)
@@ -558,56 +676,77 @@ export const api = {
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
       return request<{ status: string } & BookListResult>(`/books${suffix}`)
     },
+
     categories: () =>
       request<{ status: string; categories: BookCategory[] }>('/books/categories'),
+
     get: (id: string) =>
       request<{ status: string; book: Book }>(`/books/${id}`),
 
-    // CM / admin
     adminList: () =>
       request<{ status: string; books: Book[] }>('/books/admin/mine'),
+
     create: (data: BookInput) =>
       request<{ status: string; book: Book }>('/books', {
-        method: 'POST', body: JSON.stringify(data),
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
+
     update: (id: string, data: Partial<BookInput>) =>
       request<{ status: string; book: Book }>(`/books/${id}`, {
-        method: 'PATCH', body: JSON.stringify(data),
+        method: 'PATCH',
+        body: JSON.stringify(data),
       }),
+
     delete: (id: string) =>
       request<{ status: string; message: string }>(`/books/${id}`, { method: 'DELETE' }),
   },
 
-  // ─── Speech-to-Text (voice input) ──────────────────────────
+  // ─── STT ─────────────────────────────────────────────────────
   stt: {
     transcribe: async (audio: Blob, language: 'uz' | 'ru' | 'en' = 'uz'): Promise<{ status: string; text: string }> => {
-      const token = getToken()
+      const token = tokenStore.get()
       const form = new FormData()
       form.append('audio', audio, 'recording.webm')
       form.append('language', language)
-      // Do NOT set Content-Type — the browser adds the multipart boundary.
       const res = await fetch(`${API_URL}/stt`, {
         method: 'POST',
+        credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: form,
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
+        if (res.status === 401) {
+          const newToken = await refreshAccessToken()
+          if (newToken) {
+            const retry = await fetch(`${API_URL}/stt`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { Authorization: `Bearer ${newToken}` },
+              body: form,
+            })
+            const retryData = await retry.json().catch(() => null)
+            if (!retry.ok) throw new Error((retryData && retryData.message) || 'Nutqni aniqlab bo\'lmadi')
+            return retryData as { status: string; text: string }
+          }
+          dispatchSessionExpired()
+        }
         throw new Error((data && data.message) || 'Nutqni aniqlab bo\'lmadi')
       }
       return data as { status: string; text: string }
     },
   },
 
-  // ─── Payments (Click / Payme hosted checkout) ──────────────
+  // ─── Payments ─────────────────────────────────────────────────
   payments: {
     checkout: (paymentRequestId: string, provider: 'click' | 'payme') =>
       request<{ status: string; url: string; provider: string }>(
-        `/payments/checkout/${paymentRequestId}?provider=${provider}`
+        `/payments/checkout/${paymentRequestId}?provider=${provider}`,
       ),
   },
 
-  // ─── Adaptive learning ──────────────────────────────────────
+  // ─── Learning ─────────────────────────────────────────────────
   learning: {
     path: () =>
       request<{ status: string; path: LearningPathItem[] }>('/learning/path'),
@@ -618,59 +757,90 @@ export const api = {
       if (params.limit) qs.set('limit', String(params.limit))
       const suffix = qs.toString() ? `?${qs.toString()}` : ''
       return request<{ status: string; recommendations: RecommendedCase[]; targets: { category: string; level: number; struggling: boolean }[] }>(
-        `/learning/recommendations${suffix}`
+        `/learning/recommendations${suffix}`,
       )
     },
   },
 
-  // ─── Balance / manual top-up / subscription from balance ────
+  // ─── Balance ──────────────────────────────────────────────────
   balance: {
     me: () =>
       request<{ status: string; balance: number; points: number; isPremium: boolean; subscription: UserSubscription; prices: { monthly: number; yearly: number; yearlyOld: number } }>('/balance/me'),
+
     cards: () =>
       request<{ status: string; cards: ActiveCard[] }>('/balance/cards'),
+
     topup: (data: { amount: number; cardId: string; receiptUrl: string }) =>
-      request<{ status: string; message: string; topUpId: string }>('/balance/topup', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ status: string; message: string; topUpId: string }>('/balance/topup', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
     myTopUps: () =>
       request<{ status: string; topups: TopUpRow[] }>('/balance/topups'),
+
     subscriptions: () =>
       request<{ status: string; transactions: SubscriptionTxRow[] }>('/balance/subscriptions'),
+
     subscribe: (plan: 'monthly' | 'yearly') =>
-      request<{ status: string; message: string; balance: number; expiresAt: string }>('/balance/subscribe', { method: 'POST', body: JSON.stringify({ plan }) }),
+      request<{ status: string; message: string; balance: number; expiresAt: string }>('/balance/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ plan }),
+      }),
+
     notifications: () =>
       request<{ status: string; notifications: AppNotification[]; unread: number }>('/balance/notifications'),
+
     markRead: (id?: string) =>
-      request<{ status: string }>('/balance/notifications/read', { method: 'POST', body: JSON.stringify({ id }) }),
+      request<{ status: string }>('/balance/notifications/read', {
+        method: 'POST',
+        body: JSON.stringify({ id }),
+      }),
   },
 
-  // ─── Referrals ──────────────────────────────────────────────
+  // ─── Referrals ────────────────────────────────────────────────
   referrals: {
     me: () =>
       request<ReferralStats>('/referrals/me'),
   },
 
-  // ─── Admin: cards + top-up requests ─────────────────────────
+  // ─── Payment admin ────────────────────────────────────────────
   paymentAdmin: {
     listCards: () =>
       request<{ status: string; cards: AdminCard[] }>('/admin/cards'),
+
     createCard: (data: Partial<AdminCard>) =>
-      request<{ status: string; card: AdminCard }>('/admin/cards', { method: 'POST', body: JSON.stringify(data) }),
+      request<{ status: string; card: AdminCard }>('/admin/cards', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
     updateCard: (id: string, data: Partial<AdminCard>) =>
-      request<{ status: string; card: AdminCard }>(`/admin/cards/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      request<{ status: string; card: AdminCard }>(`/admin/cards/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
     deleteCard: (id: string) =>
       request<{ status: string; message: string }>(`/admin/cards/${id}`, { method: 'DELETE' }),
+
     listTopUps: (status?: string) => {
       const qs = status ? `?status=${status}` : ''
       return request<{ status: string; total: number; topups: AdminTopUp[] }>(`/admin/topups${qs}`)
     },
+
     approveTopUp: (id: string) =>
       request<{ status: string; message: string; newBalance: number }>(`/admin/topups/${id}/approve`, { method: 'POST' }),
+
     rejectTopUp: (id: string, reason: string) =>
-      request<{ status: string; message: string }>(`/admin/topups/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+      request<{ status: string; message: string }>(`/admin/topups/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
   },
 }
 
-// ─── Types ────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ActiveCard {
   _id: string
@@ -679,11 +849,13 @@ export interface ActiveCard {
   bankName: string
   description?: string
 }
+
 export interface AdminCard extends ActiveCard {
   isActive: boolean
   sortOrder: number
   createdAt?: string
 }
+
 export interface TopUpRow {
   _id: string
   amount: number
@@ -694,6 +866,7 @@ export interface TopUpRow {
   createdAt: string
   reviewedAt?: string
 }
+
 export interface SubscriptionTxRow {
   _id: string
   plan: 'monthly' | 'yearly'
@@ -705,11 +878,13 @@ export interface SubscriptionTxRow {
   expiresAt: string
   createdAt: string
 }
+
 export interface AdminTopUp extends Omit<TopUpRow, 'card'> {
   user: { _id: string; name: string; email: string; phone?: string; username?: string } | string
   card?: { cardNumber: string; cardHolderName: string; bankName: string } | string
   reviewedByAdmin?: { name: string } | string
 }
+
 export interface AppNotification {
   _id: string
   title: string
@@ -748,7 +923,6 @@ export interface CaseStats {
 }
 
 export interface CMDashboardStats {
-  // Content counts
   totalCases: number
   totalEmergencyCases: number
   totalCourses: number
@@ -756,22 +930,18 @@ export interface CMDashboardStats {
   totalVideos: number
   totalCertificates: number
   totalCategories: number
-  // Publishing state
   publishedCases: number
   draftCases: number
   reviewCases: number
-  // Users & usage
   totalUsers: number
   premiumUsers: number
   totalAttempts: number
   completedAttempts: number
   completionRate: number
   avgScore: number
-  // Modules without models yet (0 for now, filled in later stages)
   totalBooks: number
   totalExams: number
   totalQuestions: number
-  // Breakdowns for charts
   casesByCategory: { category: string; count: number }[]
   casesByDifficulty: { level: number; count: number }[]
   casesByType: { type: string; count: number }[]
@@ -879,7 +1049,6 @@ export interface CourseCertificate {
   course?: { _id: string; title: string; slug: string } | string
 }
 
-// ─── Exam ──────────────────────────────────────────────────────
 export type QuestionType = 'single' | 'multiple' | 'truefalse' | 'short'
 
 export interface ExamSettings {
@@ -891,7 +1060,6 @@ export interface ExamSettings {
   isPublished: boolean
 }
 
-/** Admin/CM view — includes the answer key (isCorrect / correctText). */
 export interface AdminQuestion {
   _id: string
   type: QuestionType
@@ -903,7 +1071,6 @@ export interface AdminQuestion {
   explanation?: string
 }
 
-/** User view — answer key stripped. */
 export interface UserQuestion {
   _id: string
   type: QuestionType
@@ -1086,15 +1253,9 @@ export interface BackendCase {
     range: string
     status: 'normal' | 'high' | 'low' | 'critical'
   }>
-  bloodTest?: Array<{
-    name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical'
-  }>
-  biochemTest?: Array<{
-    name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical'
-  }>
-  urineTest?: Array<{
-    name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical'
-  }>
+  bloodTest?: Array<{ name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical' }>
+  biochemTest?: Array<{ name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical' }>
+  urineTest?: Array<{ name: string; value: string; unit: string; range: string; status: 'normal' | 'high' | 'low' | 'critical' }>
   instrumentalTests?: Array<'ekg' | 'uzi' | 'rentgen' | 'kt' | 'mrt' | 'endoskopiya'>
   laboratoryTests?: Array<'qon_analiz' | 'siydik_analiz' | 'bioximik'>
   correctDiagnosis: string
@@ -1244,7 +1405,6 @@ export interface Attempt {
   createdAt: string
 }
 
-// ─── Referral types ──────────────────────────────────────────
 export interface ReferralStats {
   status: string
   referralCode: string
@@ -1279,7 +1439,6 @@ export interface ReferralAnalytics {
   }[]
 }
 
-// ─── Support tickets ─────────────────────────────────────────
 export interface SupportStats {
   total: number
   open: number

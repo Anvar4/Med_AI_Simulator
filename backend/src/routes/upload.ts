@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 
 import { protect, restrictTo } from '../middleware/auth';
+import { rejectJsInPdf, sanitizeFilename, validateUploadedFile } from '../middleware/uploadSecurity';
 import { buildObjectKey, isSpacesEnabled, uploadToSpaces } from '../services/storageService';
 
 const router = express.Router()
@@ -23,22 +24,28 @@ function resolveUploadDir(): string {
   return candidates[0]
 }
 
-// File filter — only allow images, videos, gifs and PDF (payment receipts).
+// Allowlist: only safe MIME types
+const ALLOWED_MIMES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'video/mp4', 'video/webm',
+  'application/pdf',
+])
+
 const fileFilter = (_req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedMimes = [
-    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/webm',
-    'application/pdf',
-  ]
-  if (allowedMimes.includes(file.mimetype)) cb(null, true)
-  else cb(new Error('Faqat rasm (JPEG, PNG, GIF, WebP), video (MP4, WebM) yoki PDF formatlariga ruxsat beriladi'))
+  if (ALLOWED_MIMES.has(file.mimetype)) {
+    cb(null, true)
+  } else {
+    cb(new Error('Faqat rasm (JPEG, PNG, GIF, WebP), video (MP4, WebM) yoki PDF formatlariga ruxsat beriladi'))
+  }
 }
 
-// Always buffer in memory; the storage backend (Spaces vs disk) is decided per
-// request inside the handler so env vars are read after dotenv has loaded.
-// 200MB — videos (mp4/webm) need more room than images/PDFs. Spaces upload
-// buffers in memory, so this is capped to stay safe on a small-RAM server.
-const upload = multer({ storage: multer.memoryStorage(), fileFilter, limits: { fileSize: 200 * 1024 * 1024 } })
+// Buffer in memory — validated before writing to disk/S3
+// 200MB max for video uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: { fileSize: 200 * 1024 * 1024, files: 1 },
+})
 
 function saveToDisk(file: Express.Multer.File): string {
   let dir = resolveUploadDir()
@@ -49,24 +56,39 @@ function saveToDisk(file: Express.Multer.File): string {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
   }
   const ext = path.extname(file.originalname)
-  const safeName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_')
+  // sanitizeFilename already called by validateUploadedFile
+  const safeName = sanitizeFilename(path.basename(file.originalname, ext)).replace(/[^a-zA-Z0-9_-]/g, '_')
   const filename = `${safeName}-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`
   fs.writeFileSync(path.join(dir, filename), file.buffer)
   return filename
 }
 
 // POST /api/upload — upload a file (instructor/admin only)
-router.post('/', protect, restrictTo('instructor', 'admin'), (req, res) => {
-  upload.single('file')(req, res, async (err) => {
-    if (err) {
-      res.status(400).json({ message: err.message || 'Fayl yuklashda xatolik' })
-      return
-    }
+router.post(
+  '/',
+  protect,
+  restrictTo('instructor', 'admin'),
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        res.status(400).json({ message: err.message || 'Fayl yuklashda xatolik' })
+        return
+      }
+      if (!req.file) {
+        res.status(400).json({ message: 'Fayl yuklanmadi' })
+        return
+      }
+      // Security: magic bytes + extension + PDF JS check
+      validateUploadedFile(req, res, () => {
+        rejectJsInPdf(req, res, next)
+      })
+    })
+  },
+  async (req: express.Request, res: express.Response) => {
     if (!req.file) {
       res.status(400).json({ message: 'Fayl yuklanmadi' })
       return
     }
-
     try {
       let fileUrl: string
       let filename: string
@@ -93,7 +115,7 @@ router.post('/', protect, restrictTo('instructor', 'admin'), (req, res) => {
       console.error('Upload error:', uploadErr)
       res.status(500).json({ message: 'Faylni saqlashda xatolik yuz berdi' })
     }
-  })
-})
+  },
+)
 
 export default router
