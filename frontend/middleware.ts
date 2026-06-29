@@ -84,7 +84,12 @@ export function middleware(req: NextRequest): NextResponse {
 
   // ── ADMIN subdomain ────────────────────────────────────────────────────────
   if (ADMIN_HOST_RE.test(host)) {
-    // In dev: allow without role check so local preview works
+    // /login va /forgot-password — har doim o'tkazib yuborish (redirect loop oldini olish)
+    if (pathname.startsWith('/login') || pathname.startsWith('/forgot-password') || pathname.startsWith('/register')) {
+      const res = NextResponse.next()
+      setSecurityHeaders(res)
+      return res
+    }
     if (!isDevMode) {
       if (!authed) {
         return NextResponse.redirect(new URL('/login', `https://${host}`))
@@ -98,7 +103,7 @@ export function middleware(req: NextRequest): NextResponse {
       return NextResponse.rewrite(new URL('/admin', req.url))
     }
     // Block non-admin pages on admin subdomain
-    if (!pathname.startsWith('/admin') && !pathname.startsWith('/login')) {
+    if (!pathname.startsWith('/admin')) {
       return NextResponse.rewrite(new URL('/admin', req.url))
     }
     const res = NextResponse.next()
@@ -108,6 +113,12 @@ export function middleware(req: NextRequest): NextResponse {
 
   // ── MANAGER subdomain ──────────────────────────────────────────────────────
   if (MANAGER_HOST_RE.test(host)) {
+    // /login va /forgot-password — har doim o'tkazib yuborish (redirect loop oldini olish)
+    if (pathname.startsWith('/login') || pathname.startsWith('/forgot-password') || pathname.startsWith('/register')) {
+      const res = NextResponse.next()
+      setSecurityHeaders(res)
+      return res
+    }
     if (!isDevMode) {
       if (!authed) {
         return NextResponse.redirect(new URL('/login', `https://${host}`))
@@ -119,7 +130,7 @@ export function middleware(req: NextRequest): NextResponse {
     if (pathname === '/') {
       return NextResponse.rewrite(new URL('/content-manager', req.url))
     }
-    if (!pathname.startsWith('/content-manager') && !pathname.startsWith('/login')) {
+    if (!pathname.startsWith('/content-manager')) {
       return NextResponse.rewrite(new URL('/content-manager', req.url))
     }
     const res = NextResponse.next()
