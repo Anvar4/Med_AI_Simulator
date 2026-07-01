@@ -28,6 +28,13 @@ const [showPassword, setShowPassword] = useState(false)
 const [error, setError] = useState('')
 const [isSubmitting, setIsSubmitting] = useState(false)
 const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+// admin./manager. subdomenlarida Google login KO'RSATILMAYDI — faqat login/parol
+const [isPanelHost, setIsPanelHost] = useState(false)
+
+useEffect(() => {
+const h = window.location.hostname.toLowerCase()
+setIsPanelHost(h.startsWith('admin.') || h.startsWith('manager.'))
+}, [])
 
 useEffect(() => {
 if (!isLoading && user) {
@@ -172,7 +179,9 @@ className='w-full max-w-md'
 </p>
 </div>
 
-{/* Google — birinchi GoogleLogin komponenti, agar yuklanmasa custom button */}
+{/* Google login — faqat asosiy domenda; admin./manager. subdomenlarida YO'Q */}
+{!isPanelHost && (
+<>
 <div className='w-full mb-4'>
 <div className={`[&>div]:w-full [&>div>div]:w-full [&_iframe]:w-full ${isGoogleLoading ? 'opacity-60 pointer-events-none' : ''}`}>
   <GoogleLogin
@@ -207,6 +216,8 @@ className='w-full max-w-md'
 <span className='text-xs text-text-secondary'>{t('auth.or')}</span>
 <div className='h-px flex-1 bg-border' />
 </div>
+</>
+)}
 
 <form onSubmit={handleSubmit} className='space-y-4'>
 <div>
