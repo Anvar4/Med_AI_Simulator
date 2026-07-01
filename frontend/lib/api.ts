@@ -3,7 +3,19 @@
 // calls refresh() immediately on mount to restore a session from the
 // HttpOnly refresh-token cookie.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+// Har bir host o'z /api'siga so'rov yuboradi (same-origin) — admin./manager.
+// subdomenlarida ham cross-origin "Failed to fetch" bo'lmasligi uchun.
+// SSR/build vaqtida window yo'q — o'shanda env qiymatiga qaytamiz.
+function resolveApiUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+  if (typeof window === 'undefined') return envUrl
+  const { protocol, host } = window.location
+  // localhost dev — env qiymatini saqlaymiz (odatda :5000)
+  if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) return envUrl
+  return `${protocol}//${host}/api`
+}
+
+const API_URL = resolveApiUrl()
 
 let _accessToken: string | null = null
 let _refreshPromise: Promise<string | null> | null = null
