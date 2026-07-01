@@ -8,8 +8,11 @@ const isDev = process.env.NODE_ENV === 'development'
 const CSP_DIRECTIVES = [
   "default-src 'self'",
   isDev
-    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline'",
+    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://accounts.google.com https://apis.google.com"
+    : "script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com",
+  isDev
+    ? "script-src-elem 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com"
+    : "script-src-elem 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
