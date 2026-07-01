@@ -65,8 +65,10 @@ const SECURITY_HEADERS = [
     value: 'camera=(), microphone=(self), geolocation=(), payment=(self)',
   },
   {
+    // Google OAuth popup window.opener orqali natija qaytaradi —
+    // 'same-origin' buni bloklaydi (popup_closed). 'allow-popups' ruxsat beradi.
     key: 'Cross-Origin-Opener-Policy',
-    value: 'same-origin',
+    value: 'same-origin-allow-popups',
   },
   {
     key: 'Cross-Origin-Embedder-Policy',
