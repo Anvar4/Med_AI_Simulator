@@ -84,8 +84,13 @@ export function middleware(req: NextRequest): NextResponse {
 
   // ── ADMIN subdomain ────────────────────────────────────────────────────────
   if (ADMIN_HOST_RE.test(host)) {
-    // /login va /forgot-password — har doim o'tkazib yuborish (redirect loop oldini olish)
-    if (pathname.startsWith('/login') || pathname.startsWith('/forgot-password') || pathname.startsWith('/register')) {
+    // Panelda ro'yxatdan o'tish / parol tiklash YO'Q — faqat login/parol.
+    // /register va /forgot-password → /login ga yo'naltiriladi.
+    if (pathname.startsWith('/register') || pathname.startsWith('/forgot-password')) {
+      return NextResponse.redirect(new URL('/login', `https://${host}`))
+    }
+    // /login — har doim o'tkazib yuborish (redirect loop oldini olish)
+    if (pathname.startsWith('/login')) {
       const res = NextResponse.next()
       setSecurityHeaders(res)
       return res
@@ -113,8 +118,12 @@ export function middleware(req: NextRequest): NextResponse {
 
   // ── MANAGER subdomain ──────────────────────────────────────────────────────
   if (MANAGER_HOST_RE.test(host)) {
-    // /login va /forgot-password — har doim o'tkazib yuborish (redirect loop oldini olish)
-    if (pathname.startsWith('/login') || pathname.startsWith('/forgot-password') || pathname.startsWith('/register')) {
+    // Panelda ro'yxatdan o'tish / parol tiklash YO'Q — faqat login/parol.
+    if (pathname.startsWith('/register') || pathname.startsWith('/forgot-password')) {
+      return NextResponse.redirect(new URL('/login', `https://${host}`))
+    }
+    // /login — har doim o'tkazib yuborish (redirect loop oldini olish)
+    if (pathname.startsWith('/login')) {
       const res = NextResponse.next()
       setSecurityHeaders(res)
       return res

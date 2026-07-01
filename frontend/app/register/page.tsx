@@ -344,12 +344,6 @@ function RegisterPageInner() {
             )}
           </AnimatePresence>
         </div>
-
-        {step === 'method' && (
-          <p className='text-center text-sm text-text-secondary mt-4'>
-            Akkauntingiz bormi?{' '}<Link href='/login' className='text-primary hover:underline font-medium'>Kirish</Link>
-          </p>
-        )}
       </motion.div>
     </div>
   )
