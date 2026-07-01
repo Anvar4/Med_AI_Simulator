@@ -1,6 +1,7 @@
 import os from 'os'
 import { Request, Response } from 'express'
 import mongoose from 'mongoose'
+import { Book } from '../models/Book'
 import { Case } from '../models/Case'
 import { CaseAttempt } from '../models/CaseAttempt'
 import { Category } from '../models/Category'
@@ -87,6 +88,7 @@ export const getCMDashboard = async (_req: Request, res: Response): Promise<void
       totalCategories,
       totalUsers,
       premiumUsers,
+      totalBooksCount,
       attemptsAgg,
     ] = await Promise.all([
       Case.countDocuments({}),
@@ -105,6 +107,7 @@ export const getCMDashboard = async (_req: Request, res: Response): Promise<void
       Category.countDocuments({}),
       User.countDocuments({}),
       User.countDocuments({ isPremium: true }),
+      Book.countDocuments({}),
       CaseAttempt.aggregate([
         {
           $group: {
@@ -146,8 +149,8 @@ export const getCMDashboard = async (_req: Request, res: Response): Promise<void
         completedAttempts: attempts.completed,
         completionRate,
         avgScore: Math.round((attempts.avgScore || 0) * 10) / 10,
-        // Modules without models yet (filled in later stages)
-        totalBooks: 0,
+        totalBooks: totalBooksCount,
+        // Modules without dashboard wiring yet
         totalExams: 0,
         totalQuestions: 0,
         // Breakdowns for charts

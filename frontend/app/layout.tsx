@@ -95,11 +95,14 @@ export default function RootLayout({
 				<script dangerouslySetInnerHTML={{ __html: `
 					(function() {
 						try {
-							var raw = localStorage.getItem('med-ai-auth');
 							var theme = 'light';
-							if (raw) {
-								var parsed = JSON.parse(raw);
-								if (parsed && parsed.preferences && parsed.preferences.darkMode === true) theme = 'dark';
+							var keys = ['med-ai-user', 'med-ai-auth'];
+							for (var i = 0; i < keys.length; i++) {
+								var raw = localStorage.getItem(keys[i]);
+								if (raw) {
+									var parsed = JSON.parse(raw);
+									if (parsed && parsed.preferences && parsed.preferences.darkMode === true) { theme = 'dark'; break; }
+								}
 							}
 							document.documentElement.classList.add(theme);
 						} catch(e) {

@@ -9,6 +9,7 @@ export interface IUser extends Document {
   name: string
   email: string
   password?: string
+  passwordChangedAt?: Date
   googleId?: string
   isEmailVerified: boolean
   role: 'student' | 'instructor' | 'admin'
@@ -71,6 +72,7 @@ const userSchema = new Schema<IUser>(
       trim: true,
     },
     password: { type: String, minlength: 6, select: false },
+    passwordChangedAt: { type: Date, select: false },
     googleId: { type: String, sparse: true },
     isEmailVerified: { type: Boolean, default: false },
     role: {
@@ -132,6 +134,9 @@ userSchema.pre('save', async function (next) {
   if (!this.isModified('password') || !this.password) return next()
   const salt = await bcrypt.genSalt(12)
   this.password = await bcrypt.hash(this.password, salt)
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date(Date.now() - 1000)
+  }
   next()
 })
 

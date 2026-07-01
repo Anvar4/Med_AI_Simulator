@@ -2,7 +2,22 @@ import bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
-import { AuthRequest } from '../middleware/auth';
+import {
+  AuthRequest,
+  clearRefreshCookie,
+  revokeToken,
+  setRefreshCookie,
+  signAccessToken,
+  signRefreshToken,
+  signTempToken,
+} from '../middleware/auth';
+import { logFailedLogin, logSecurityEvent, logSuccessLogin } from '../middleware/auditLog';
+import {
+  isLocked,
+  recordFailedAttempt,
+  remainingLockSecs,
+  resetAttempts,
+} from '../middleware/bruteForce';
 import { OTP } from '../models/OTP';
 import { User } from '../models/User';
 import { grantReferralReward } from '../services/balanceService';
@@ -12,14 +27,9 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
 
 // ─── Helpers ──────────────────────────────────────────────────
 
+// Legacy alias for code paths that already call signToken (still used in temp/OTP flows)
 function signToken(id: string): string {
-  return jwt.sign({ id }, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  } as jwt.SignOptions)
-}
-
-function signTempToken(payload: object): string {
-  return jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: '15m' } as jwt.SignOptions)
+  return signAccessToken(id)
 }
 
 function generateOTP(): string {
@@ -332,8 +342,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const user = await User.findOne({ username: username.toLowerCase().trim() }).select('+password')
+    const identifier = username.toLowerCase().trim()
+
+    // Brute-force check
+    if (isLocked(req, identifier)) {
+      const secs = remainingLockSecs(req, identifier)
+      logSecurityEvent(req, 'login_blocked', { identifier })
+      res.status(429).json({
+        message: `Akkaunt vaqtincha bloklandi. ${Math.ceil(secs / 60)} daqiqadan so'ng urinib ko'ring.`,
+      })
+      return
+    }
+
+    const user = await User.findOne({ username: identifier }).select('+password')
     if (!user) {
+      recordFailedAttempt(req, identifier)
+      logFailedLogin(req, identifier)
       res.status(401).json({ message: "Login yoki parol noto'g'ri" })
       return
     }
@@ -344,14 +368,92 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     if (!(await user.comparePassword(password))) {
+      recordFailedAttempt(req, identifier)
+      logFailedLogin(req, identifier)
       res.status(401).json({ message: "Login yoki parol noto'g'ri" })
       return
     }
 
-    const token = signToken(String(user._id))
-    res.json({ status: 'success', token, user: buildUserResponse(user) })
+    resetAttempts(req, identifier)
+    logSuccessLogin(req, String(user._id))
+
+    const accessToken = signAccessToken(String(user._id))
+    const refreshToken = signRefreshToken(String(user._id))
+    setRefreshCookie(res, refreshToken)
+
+    res.json({ status: 'success', token: accessToken, user: buildUserResponse(user) })
   } catch (error) {
     console.error('login error:', error)
+    res.status(500).json({ message: 'Server xatosi' })
+  }
+}
+
+// ─── Refresh Token ─────────────────────────────────────────────
+// POST /api/auth/refresh  (httpOnly cookie: refreshToken)
+
+export const refreshToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = req.cookies?.refreshToken
+    if (!token) {
+      res.status(401).json({ message: 'Refresh token yo\'q' })
+      return
+    }
+
+    let decoded: { id: string; jti?: string; type?: string }
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!,
+      ) as typeof decoded
+    } catch {
+      clearRefreshCookie(res)
+      res.status(401).json({ message: 'Refresh token yaroqsiz yoki muddati o\'tgan' })
+      return
+    }
+
+    if (decoded.type !== 'refresh') {
+      clearRefreshCookie(res)
+      res.status(401).json({ message: 'Token turi noto\'g\'ri' })
+      return
+    }
+
+    const user = await User.findById(decoded.id)
+    if (!user) {
+      clearRefreshCookie(res)
+      res.status(401).json({ message: 'Foydalanuvchi topilmadi' })
+      return
+    }
+
+    // Rotate: revoke old refresh token and issue new pair
+    if (decoded.jti) revokeToken(decoded.jti)
+
+    const newAccess = signAccessToken(String(user._id))
+    const newRefresh = signRefreshToken(String(user._id))
+    setRefreshCookie(res, newRefresh)
+
+    res.json({ status: 'success', token: newAccess, user: buildUserResponse(user) })
+  } catch (error) {
+    console.error('refreshToken error:', error)
+    res.status(500).json({ message: 'Server xatosi' })
+  }
+}
+
+// ─── Logout ────────────────────────────────────────────────────
+// POST /api/auth/logout (protected)
+
+export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    // Revoke current access token
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.decode(authHeader.split(' ')[1]) as { jti?: string } | null
+        if (decoded?.jti) revokeToken(decoded.jti)
+      } catch { /* ignore */ }
+    }
+    clearRefreshCookie(res)
+    res.json({ status: 'success', message: 'Tizimdan chiqildi' })
+  } catch {
     res.status(500).json({ message: 'Server xatosi' })
   }
 }
@@ -470,6 +572,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
 
     const hashedNew = await bcrypt.hash(newPassword, await bcrypt.genSalt(12))
     updateData.password = hashedNew
+    updateData.passwordChangedAt = new Date()
 
     if (newUsername) {
       const usernameClean = newUsername.toLowerCase().trim()
@@ -551,7 +654,7 @@ export const confirmPasswordChange = async (req: AuthRequest, res: Response): Pr
       return
     }
 
-    await User.findByIdAndUpdate(user._id, { password: otp.tempData })
+    await User.findByIdAndUpdate(user._id, { password: otp.tempData, passwordChangedAt: new Date() })
     await otp.deleteOne()
     res.json({ message: "Parol muvaffaqiyatli o'zgartirildi" })
   } catch (error) {

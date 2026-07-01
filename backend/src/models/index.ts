@@ -1,4 +1,5 @@
 export { BalanceTopUp } from './BalanceTopUp'
+export { Book } from './Book'
 export { Case } from './Case'
 export { CaseAttempt } from './CaseAttempt'
 export { Category } from './Category'

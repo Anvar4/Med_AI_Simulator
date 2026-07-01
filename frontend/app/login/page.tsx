@@ -6,7 +6,7 @@ import LanguageSwitcher from '@/components/layout/LanguageSwitcher';
 import { api } from '@/lib/api';
 import { backendUserToAuth, useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/language-context';
-import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import {
     Eye,
@@ -19,8 +19,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
-const { login, loginWithData, user } = useAuth()
-const { t } = useT()
+const { login, loginWithData, user, isLoading } = useAuth()
+const { t, locale } = useT()
 const router = useRouter()
 const [username, setUsername] = useState('')
 const [password, setPassword] = useState('')
@@ -28,14 +28,34 @@ const [showPassword, setShowPassword] = useState(false)
 const [error, setError] = useState('')
 const [isSubmitting, setIsSubmitting] = useState(false)
 const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+// admin./manager. subdomenlarida Google login KO'RSATILMAYDI — faqat login/parol
+const [isPanelHost, setIsPanelHost] = useState(false)
 
 useEffect(() => {
-if (user) {
-if (user.role === 'admin') router.push('/admin')
-else if (user.role === 'content-manager') router.push('/content-manager')
-else router.push('/dashboard')
+const h = window.location.hostname.toLowerCase()
+setIsPanelHost(h.startsWith('admin.') || h.startsWith('manager.'))
+}, [])
+
+useEffect(() => {
+if (!isLoading && user) {
+const host = window.location.hostname.toLowerCase()
+const onAdminHost = host.startsWith('admin.')
+const onManagerHost = host.startsWith('manager.')
+const isPanel = onAdminHost || onManagerHost
+if (user.role === 'admin') {
+  // Asosiy domendan kirgan admin → admin subdomain panelga (asosiy domenda /admin YO'Q → 404)
+  if (isPanel) router.push('/admin')
+  else window.location.href = 'https://admin.medaisimulator.uz/admin'
+} else if (user.role === 'content-manager') {
+  if (isPanel) router.push('/content-manager')
+  else window.location.href = 'https://manager.medaisimulator.uz/content-manager'
+} else {
+  // Oddiy user — panelda bo'lsa asosiy domenga qaytariladi
+  if (isPanel) window.location.href = 'https://medaisimulator.uz/dashboard'
+  else router.push('/dashboard')
 }
-}, [user, router])
+}
+}, [user, isLoading, router])
 
 const handleSubmit = async (e: React.FormEvent) => {
 e.preventDefault()
@@ -46,25 +66,70 @@ if (!result.success && result.error) setError(result.error)
 setIsSubmitting(false)
 }
 
-const googleLogin = useGoogleLogin({
-onSuccess: async tokenResponse => {
+const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+if (!credentialResponse.credential) {
+  setError('Google credential olinmadi')
+  return
+}
 setIsGoogleLoading(true)
 setError('')
 try {
-const res = await api.auth.googleAccessToken(tokenResponse.access_token)
-loginWithData(backendUserToAuth(res.user, res.token))
+  const res = await api.auth.google(credentialResponse.credential)
+  loginWithData(backendUserToAuth(res.user, res.token), res.token)
 } catch (err) {
-const msg = err instanceof Error ? err.message : 'Google orqali kirishda xatolik'
-setError(msg)
+  const msg = err instanceof Error ? err.message : 'Google orqali kirishda xatolik'
+  setError(msg)
 } finally {
-setIsGoogleLoading(false)
+  setIsGoogleLoading(false)
 }
+}
+
+const googleLoginPopup = useGoogleLogin({
+flow: 'implicit',
+onSuccess: async tokenResponse => {
+  setIsGoogleLoading(true)
+  setError('')
+  try {
+    const res = await api.auth.googleAccessToken(tokenResponse.access_token)
+    loginWithData(backendUserToAuth(res.user, res.token), res.token)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Google orqali kirishda xatolik'
+    setError(msg)
+  } finally {
+    setIsGoogleLoading(false)
+  }
 },
-onError: () => {
-setError('Google orqali kirishda xatolik yuz berdi')
-setIsGoogleLoading(false)
+onError: errorResponse => {
+  console.error('[GoogleLogin] onError:', errorResponse)
+  setError(`Google xatosi: ${errorResponse?.error_description || errorResponse?.error || 'noma\'lum'}`)
+  setIsGoogleLoading(false)
+},
+onNonOAuthError: nonOAuthErr => {
+  // popup yopildi / blokeri / FedCM rad etdi
+  console.error('[GoogleLogin] onNonOAuthError:', nonOAuthErr)
+  setError(`Popup ochilmadi (${nonOAuthErr?.type || 'noma\'lum'}). Popup blokerini o'chiring yoki uchinchi tomon cookie\'larini yoqing.`)
+  setIsGoogleLoading(false)
 },
 })
+
+const handleGooglePopupClick = () => {
+const cid = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+console.log('[GoogleLogin] clientId mavjud:', !!cid, cid ? cid.slice(0, 20) + '…' : '(BO\'SH!)')
+if (!cid) {
+  setError('Google clientId topilmadi (build env muammosi)')
+  return
+}
+try {
+  googleLoginPopup()
+} catch (e) {
+  console.error('[GoogleLogin] popup chaqirishda exception:', e)
+  setError('Google popup chaqirilmadi: ' + (e instanceof Error ? e.message : String(e)))
+}
+}
+
+if (isLoading || user) {
+return <div className='min-h-screen bg-secondary flex items-center justify-center'><div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' /></div>
+}
 
 return (
 <div className='min-h-screen bg-secondary flex relative'>
@@ -119,35 +184,44 @@ className='w-full max-w-md'
 <div className='bg-surface rounded-2xl border border-border p-6 sm:p-8'>
 <div className='mb-6'>
 <h2 className='text-xl font-bold text-text-primary mb-1'>{t('auth.signInTitle')}</h2>
+{!isPanelHost && (
 <p className='text-sm text-text-secondary'>
 {t('auth.signInSubtitle')}{' '}
 <Link href='/register' className='text-primary hover:underline'>
 {t('auth.registerLink')}
 </Link>
 </p>
+)}
 </div>
 
-{/* Google */}
-<button
-type='button'
-onClick={() => googleLogin()}
-disabled={isGoogleLoading || isSubmitting}
-className='w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 text-gray-800 font-medium py-2.5 px-4 rounded-xl border border-gray-200 transition-all mb-4 disabled:opacity-60'
->
-<svg width='18' height='18' viewBox='0 0 18 18'>
-<path fill='#4285F4' d='M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z' />
-<path fill='#34A853' d='M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z' />
-<path fill='#FBBC05' d='M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z' />
-<path fill='#EA4335' d='M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z' />
-</svg>
-{isGoogleLoading ? t('auth.loggingIn') : t('auth.googleLogin')}
-</button>
+{/* Google login — faqat asosiy domenda; admin./manager. subdomenlarida YO'Q */}
+{!isPanelHost && (
+<>
+<div className='w-full mb-4'>
+<div className={`[&>div]:w-full [&>div>div]:w-full [&_iframe]:w-full ${isGoogleLoading ? 'opacity-60 pointer-events-none' : ''}`}>
+  {/* key={locale} — til o'zgarganda widget qayta mount bo'lib, locale bilan render bo'ladi */}
+  <GoogleLogin
+    key={locale}
+    onSuccess={handleGoogleSuccess}
+    onError={() => handleGooglePopupClick()}
+    width='400'
+    size='large'
+    shape='rectangular'
+    logo_alignment='left'
+    text='signin_with'
+    useOneTap={false}
+    {...({ locale } as { locale: string })}
+  />
+</div>
+</div>
 
 <div className='flex items-center gap-3 mb-4'>
 <div className='h-px flex-1 bg-border' />
 <span className='text-xs text-text-secondary'>{t('auth.or')}</span>
 <div className='h-px flex-1 bg-border' />
 </div>
+</>
+)}
 
 <form onSubmit={handleSubmit} className='space-y-4'>
 <div>
@@ -167,9 +241,11 @@ className='w-full bg-surface-light border border-border rounded-xl pl-10 pr-4 py
 <div>
 <div className='flex items-center justify-between mb-1.5'>
 <label className='text-xs font-medium text-text-secondary'>{t('auth.password')}</label>
+{!isPanelHost && (
 <Link href='/forgot-password' className='text-xs text-primary hover:underline'>
 {t('auth.forgotPassword')}
 </Link>
+)}
 </div>
 <div className='relative'>
 <Lock className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/50' />
@@ -206,12 +282,14 @@ className='text-sm text-accent bg-accent/10 rounded-lg px-3 py-2'
 </Button>
 </form>
 
+{!isPanelHost && (
 <p className='text-center text-sm text-text-secondary mt-4'>
 {t('auth.noAccount')}{' '}
 <Link href='/register' className='text-primary hover:underline font-medium'>
 {t('auth.register')}
 </Link>
 </p>
+)}
 </div>
 </motion.div>
 </div>

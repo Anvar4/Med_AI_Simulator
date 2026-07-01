@@ -1,10 +1,10 @@
 'use client'
 
 import Sidebar from '@/components/layout/Sidebar'
-import { api, CourseDetail, CourseSummary, ExamResult, UserExam, UserQuestion } from '@/lib/api'
+import { api, CourseCertificate, CourseDetail, CourseSummary, ExamResult, UserExam, UserQuestion } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useT } from '@/lib/language-context'
-import { Award, CheckCircle2, ChevronLeft, GraduationCap, Lock, PlayCircle, Search, User, XCircle } from 'lucide-react'
+import { Award, CheckCircle2, ChevronLeft, Download, GraduationCap, Lock, PlayCircle, Search, ShieldCheck, User, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 /** Build a playable src for uploaded videos: absolute URLs pass through; a
@@ -115,10 +115,12 @@ function CourseCatalog({ onOpen }: { onOpen: (slug: string) => void }) {
 
 function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
   const { user } = useAuth()
+  const { t } = useT()
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [certMsg, setCertMsg] = useState<string | null>(null)
+  const [issuedCert, setIssuedCert] = useState<CourseCertificate | null>(null)
   const [showExam, setShowExam] = useState(false)
   const [examPassed, setExamPassed] = useState(false)
   // Tracks when the current video was opened, so "mark complete" reports real
@@ -133,10 +135,23 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
         setCourse(d.course)
         const first = d.course.playlists.flatMap(p => p.videos)[0]
         setActiveVideoId(prev => prev ?? first?._id ?? null)
+        // If a certificate already exists for this course, surface it (so it
+        // shows on return visits, not only the moment it's issued).
+        if (user) {
+          api.courses.myCertificates()
+            .then(r => {
+              const mine = r.certificates.find(c => {
+                const cid = typeof c.course === 'string' ? c.course : c.course?._id
+                return cid === d.course._id
+              })
+              if (mine) setIssuedCert(prev => prev ?? mine)
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => setCourse(null))
       .finally(() => setLoading(false))
-  }, [slug])
+  }, [slug, user])
 
   useEffect(() => { load() }, [load])
 
@@ -152,7 +167,7 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
     const watchedSeconds = Math.floor((Date.now() - watchStartRef.current) / 1000)
     try {
       const res = await api.courses.saveProgress(videoId, watchedSeconds, true)
-      if (res.certificate) setCertMsg(`Tabriklaymiz! Sertifikat berildi: ${res.certificate.serial}`)
+      if (res.certificate) { setIssuedCert(res.certificate); setCertMsg(null) }
       load()
     } catch (err) {
       // Surface the entitlement / watch-time errors instead of swallowing them.
@@ -191,9 +206,42 @@ function CourseViewer({ slug, onBack }: { slug: string; onBack: () => void }) {
         </div>
       )}
 
+      {/* Issued certificate — PDF download + public verify link */}
+      {issuedCert && (
+        <div className='mb-5 rounded-2xl border border-success/30 bg-success/5 overflow-hidden'>
+          <div className='px-5 py-4 flex items-center gap-3 border-b border-success/15'>
+            <div className='w-11 h-11 rounded-xl bg-success/15 flex items-center justify-center shrink-0'>
+              <Award className='w-6 h-6 text-success' />
+            </div>
+            <div className='min-w-0'>
+              <p className='text-sm font-bold text-text-primary'>{t('cert.issuedTitle')}</p>
+              <p className='text-xs text-text-secondary'>{t('cert.serial')}: <span className='font-mono'>{issuedCert.serial}</span></p>
+            </div>
+          </div>
+          <div className='px-5 py-3 flex flex-wrap gap-2'>
+            <a
+              href={api.courses.certificatePdfUrl(issuedCert.serial)}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark transition-colors'
+            >
+              <Download className='w-4 h-4' /> {t('cert.downloadPdf')}
+            </a>
+            <a
+              href={`/verify/${encodeURIComponent(issuedCert.serial)}`}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-light border border-border text-sm font-medium text-text-secondary hover:text-text-primary transition-colors'
+            >
+              <ShieldCheck className='w-4 h-4' /> {t('cert.verifyLink')}
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Final exam — unlocked once every video is completed */}
       {!course.locked && course.progress.totalVideos > 0 && course.progress.completedVideos >= course.progress.totalVideos && (
-        <ExamGate courseId={course._id} onPassed={() => { setExamPassed(true); load() }} showExam={showExam} setShowExam={setShowExam} examPassed={examPassed} setCertMsg={setCertMsg} />
+        <ExamGate courseId={course._id} onPassed={() => { setExamPassed(true); load() }} showExam={showExam} setShowExam={setShowExam} examPassed={examPassed} onCertificate={c => setIssuedCert(c)} />
       )}
 
       {course.locked ? (
@@ -295,12 +343,12 @@ export default function KurslarPage() {
 }
 
 /* ─── Final exam gate (button + modal) ─── */
-function ExamGate({ courseId, showExam, setShowExam, examPassed, setCertMsg, onPassed }: {
+function ExamGate({ courseId, showExam, setShowExam, examPassed, onCertificate, onPassed }: {
   courseId: string
   showExam: boolean
   setShowExam: (v: boolean) => void
   examPassed: boolean
-  setCertMsg: (v: string | null) => void
+  onCertificate: (cert: CourseCertificate) => void
   onPassed: () => void
 }) {
   const { t } = useT()
@@ -342,7 +390,7 @@ function ExamGate({ courseId, showExam, setShowExam, examPassed, setCertMsg, onP
       setResult(res.result)
       if (res.result.passed) {
         onPassed()
-        if (res.certificate) setCertMsg(`${t('exam.passed')} ${res.certificate.serial}`)
+        if (res.certificate) onCertificate(res.certificate)
       }
     } catch { /* silent */ } finally { setSubmitting(false) }
   }

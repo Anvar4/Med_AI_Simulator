@@ -86,7 +86,7 @@ export default function RegisterPage() {
 }
 
 function RegisterPageInner() {
-  const { loginWithData, user } = useAuth()
+  const { loginWithData, user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const refCode = searchParams.get('ref') || undefined
@@ -105,7 +105,7 @@ function RegisterPageInner() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  useEffect(() => { if (user) router.push('/dashboard') }, [user, router])
+  useEffect(() => { if (!authLoading && user) router.push('/dashboard') }, [user, authLoading, router])
   useEffect(() => {
     if (resendCooldown > 0) {
       const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
@@ -118,7 +118,7 @@ function RegisterPageInner() {
       setIsGoogleLoading(true); setError('')
       try {
         const res = await api.auth.googleAccessToken(tokenResponse.access_token)
-        loginWithData(backendUserToAuth(res.user, res.token))
+        loginWithData(backendUserToAuth(res.user, res.token), res.token)
       } catch (err) { setError(err instanceof Error ? err.message : 'Google orqali kirishda xatolik') }
       finally { setIsGoogleLoading(false) }
     },
@@ -171,7 +171,7 @@ function RegisterPageInner() {
     try {
       const verified = await api.auth.verifyOTP(email, code, 'register')
       const res = await api.auth.completeRegister(verified.tempToken, firstName.trim(), lastName.trim(), username.toLowerCase().trim(), password, avatar || undefined, refCode)
-      loginWithData(backendUserToAuth(res.user, res.token))
+      loginWithData(backendUserToAuth(res.user, res.token), res.token)
     } catch (err) { setError(err instanceof Error ? err.message : "Kod noto'g'ri") }
     finally { setIsLoading(false) }
   }
@@ -185,6 +185,10 @@ function RegisterPageInner() {
   }
 
   const stepCount: Record<Step, number> = { method: 0, personal: 1, credentials: 2, email: 3, otp: 4 }
+
+  if (authLoading || user) {
+    return <div className='min-h-screen bg-secondary flex items-center justify-center'><div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' /></div>
+  }
 
   return (
     <div className='min-h-screen bg-secondary flex items-center justify-center p-4'>
@@ -340,12 +344,6 @@ function RegisterPageInner() {
             )}
           </AnimatePresence>
         </div>
-
-        {step === 'method' && (
-          <p className='text-center text-sm text-text-secondary mt-4'>
-            Akkauntingiz bormi?{' '}<Link href='/login' className='text-primary hover:underline font-medium'>Kirish</Link>
-          </p>
-        )}
       </motion.div>
     </div>
   )

@@ -25,6 +25,7 @@ import {
   upsertExam,
 } from '../controllers/examController'
 import {
+  downloadCertificatePdf,
   getMyCertificates,
   saveVideoProgress,
   verifyCertificate,
@@ -39,6 +40,8 @@ const staff = restrictTo('admin', 'instructor')
 router.get('/', optionalAuth, listCourses)
 router.get('/categories', getCourseCategories)
 router.get('/certificates/verify/:serial', verifyCertificate)
+// Public PDF download (serial is the shareable token)
+router.get('/certificates/:serial/pdf', downloadCertificatePdf)
 
 // ─── Authenticated user actions (before /:idOrSlug) ────────────
 router.get('/certificates/my', protect, getMyCertificates)

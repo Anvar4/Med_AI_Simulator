@@ -68,8 +68,8 @@ export default function Sidebar() {
 		return items
 	}, [user, t])
 
-	const handleLogout = () => {
-		logout()
+	const handleLogout = async () => {
+		await logout()
 		router.push('/login')
 	}
 
