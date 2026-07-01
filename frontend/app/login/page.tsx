@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
 const { login, loginWithData, user, isLoading } = useAuth()
-const { t } = useT()
+const { t, locale } = useT()
 const router = useRouter()
 const [username, setUsername] = useState('')
 const [password, setPassword] = useState('')
@@ -199,7 +199,9 @@ className='w-full max-w-md'
 <>
 <div className='w-full mb-4'>
 <div className={`[&>div]:w-full [&>div>div]:w-full [&_iframe]:w-full ${isGoogleLoading ? 'opacity-60 pointer-events-none' : ''}`}>
+  {/* key={locale} — til o'zgarganda widget qayta mount bo'lib, locale bilan render bo'ladi */}
   <GoogleLogin
+    key={locale}
     onSuccess={handleGoogleSuccess}
     onError={() => handleGooglePopupClick()}
     width='400'
@@ -208,6 +210,7 @@ className='w-full max-w-md'
     logo_alignment='left'
     text='signin_with'
     useOneTap={false}
+    {...({ locale } as { locale: string })}
   />
 </div>
 </div>
