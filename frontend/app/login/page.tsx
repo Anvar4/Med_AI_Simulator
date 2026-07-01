@@ -38,9 +38,22 @@ setIsPanelHost(h.startsWith('admin.') || h.startsWith('manager.'))
 
 useEffect(() => {
 if (!isLoading && user) {
-if (user.role === 'admin') router.push('/admin')
-else if (user.role === 'content-manager') router.push('/content-manager')
-else router.push('/dashboard')
+const host = window.location.hostname.toLowerCase()
+const onAdminHost = host.startsWith('admin.')
+const onManagerHost = host.startsWith('manager.')
+const isPanel = onAdminHost || onManagerHost
+if (user.role === 'admin') {
+  // Asosiy domendan kirgan admin → admin subdomain panelga (asosiy domenda /admin YO'Q → 404)
+  if (isPanel) router.push('/admin')
+  else window.location.href = 'https://admin.medaisimulator.uz/admin'
+} else if (user.role === 'content-manager') {
+  if (isPanel) router.push('/content-manager')
+  else window.location.href = 'https://manager.medaisimulator.uz/content-manager'
+} else {
+  // Oddiy user — panelda bo'lsa asosiy domenga qaytariladi
+  if (isPanel) window.location.href = 'https://medaisimulator.uz/dashboard'
+  else router.push('/dashboard')
+}
 }
 }, [user, isLoading, router])
 
